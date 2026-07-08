@@ -10,6 +10,8 @@ const state = {
   subscription: null
 };
 
+const LOCKED_VIEW = 'subscription';
+
 const categories = {
   Receita: ['Rota', 'Shopee', 'Bonus', 'Diaria', 'Reembolso', 'Outros ganhos'],
   Despesa: ['Combustivel', 'Manutencao', 'Alimentacao', 'Internet/Celular', 'Pedagio', 'Estacionamento', 'Multas', 'Lavagem', 'Equipamentos', 'Outros gastos']
@@ -48,9 +50,15 @@ const api = {
 
     if (response.status === 204) return null;
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.message || 'Erro inesperado.');
+      const error = new Error(data.message || 'Erro inesperado.');
+      error.status = response.status;
+      error.code = data.code;
+      if (response.status === 402 || data.code === 'SUBSCRIPTION_EXPIRED') {
+        handleSubscriptionExpired(error.message);
+      }
+      throw error;
     }
 
     return data;
@@ -86,6 +94,8 @@ const elements = {
   subscriptionBadge: document.querySelector('#subscription-badge'),
   subscriptionStatusLabel: document.querySelector('#subscription-status-label'),
   subscriptionDaysLabel: document.querySelector('#subscription-days-label'),
+  subscriptionTrialEnd: document.querySelector('#subscription-trial-end'),
+  subscriptionAccessEnd: document.querySelector('#subscription-access-end'),
   renewSubscription: document.querySelector('#renew-subscription'),
   category: document.querySelector('#category'),
   reportCategory: document.querySelector('#report-category'),
@@ -218,6 +228,10 @@ function setTransactionType(type) {
 }
 
 function setView(view) {
+  if (isSubscriptionLocked() && view !== LOCKED_VIEW) {
+    view = LOCKED_VIEW;
+  }
+
   state.view = view;
   const viewExists = Boolean(document.querySelector(`.app-view[data-view="${view}"]`));
   const nextView = viewExists ? view : 'dashboard';
@@ -229,6 +243,37 @@ function setView(view) {
   document.querySelectorAll('.nav-button').forEach((button) => {
     button.classList.toggle('active', button.dataset.nav === nextView);
   });
+}
+
+function isSubscriptionLocked() {
+  return Boolean(state.token && state.subscription && !state.subscription.is_active);
+}
+
+function handleSubscriptionExpired(message) {
+  state.subscription = {
+    ...(state.subscription || {}),
+    subscription_status: 'expired',
+    is_active: false,
+    days_remaining: 0
+  };
+  renderSubscription();
+  setView(LOCKED_VIEW);
+  showToast(message || 'Renove para continuar usando o app.', 'error');
+}
+
+function updateSubscriptionLock() {
+  const locked = isSubscriptionLocked();
+  elements.appScreen.classList.toggle('is-subscription-locked', locked);
+
+  document.querySelectorAll('.nav-button').forEach((button) => {
+    const blocked = locked && button.dataset.nav !== LOCKED_VIEW;
+    button.disabled = blocked;
+    button.setAttribute('aria-disabled', String(blocked));
+  });
+
+  if (locked && state.view !== LOCKED_VIEW) {
+    setView(LOCKED_VIEW);
+  }
 }
 
 function formatDate(value) {
@@ -245,14 +290,31 @@ function renderSubscription() {
     ? 'Teste gratis ativo'
     : sub.subscription_status === 'active'
       ? 'Assinatura ativa'
-      : 'Assinatura pendente';
+      : sub.subscription_status === 'canceled'
+        ? 'Assinatura cancelada'
+        : 'Acesso expirado';
   elements.subscriptionCopy.textContent = sub.is_active
     ? `Seu acesso vence em ${formatDate(sub.access_expires_at)} (${sub.days_remaining} dias).`
     : 'Seu acesso expirou. Renove para continuar usando o app.';
-  elements.subscriptionBadge.textContent = sub.days_remaining <= 3 ? 'Vence em breve' : sub.subscription_status;
-  elements.subscriptionBadge.classList.toggle('badge-warning', sub.days_remaining <= 3);
+  elements.subscriptionBadge.textContent = !sub.is_active
+    ? 'Renovacao necessaria'
+    : sub.days_remaining <= 3
+      ? 'Vence em breve'
+      : sub.subscription_status;
+  elements.subscriptionBadge.classList.toggle('badge-warning', !sub.is_active || sub.days_remaining <= 3);
+  elements.subscriptionStatusLabel.textContent = sub.subscription_status === 'trial'
+    ? 'Teste gratis'
+    : sub.subscription_status === 'active'
+      ? 'Pro ativo'
+      : sub.subscription_status === 'canceled'
+        ? 'Cancelado'
+        : 'Expirado';
+  elements.subscriptionDaysLabel.textContent = String(sub.days_remaining || 0);
+  if (elements.subscriptionTrialEnd) elements.subscriptionTrialEnd.textContent = formatDate(sub.trial_ends_at);
+  if (elements.subscriptionAccessEnd) elements.subscriptionAccessEnd.textContent = formatDate(sub.access_expires_at);
+  updateSubscriptionLock();
 
-  if (sub.days_remaining <= 3) {
+  if (sub.is_active && sub.days_remaining <= 3) {
     showToast(`Sua assinatura vence em ${sub.days_remaining} dias.`, 'error');
   }
 }
@@ -350,7 +412,14 @@ function renderBars(selector, items, emptyText) {
 }
 
 async function refresh() {
-  await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles(), loadSubscription()]);
+  await loadSubscription();
+
+  if (isSubscriptionLocked()) {
+    setView(LOCKED_VIEW);
+    return;
+  }
+
+  await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles()]);
 }
 
 async function loadReport(event) {
@@ -614,7 +683,7 @@ window.addEventListener('offline', updateConnectionStatus);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=10').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=12').catch(() => {});
   });
 }
 
@@ -635,7 +704,10 @@ showApp();
 
 if (state.token) {
   refresh()
-    .then(loadReport)
+    .then(() => {
+      if (!isSubscriptionLocked()) return loadReport();
+      return null;
+    })
     .catch(clearSession);
 }
 

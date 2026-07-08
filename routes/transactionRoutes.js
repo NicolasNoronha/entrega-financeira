@@ -1,10 +1,12 @@
 const express = require('express');
 const transactionController = require('../controllers/transactionController');
 const authMiddleware = require('../middleware/auth');
+const subscriptionAccess = require('../middleware/subscriptionAccess');
 
 const router = express.Router();
 
 router.use(authMiddleware);
+router.use(subscriptionAccess);
 
 router.get('/', transactionController.index);
 router.post('/', transactionController.create);

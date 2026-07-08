@@ -12,7 +12,7 @@
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/styles.css?v=11">
+    <link rel="stylesheet" href="/styles.css?v=12">
   </head>
   <body class="min-h-screen bg-zinc-950 text-zinc-100 app-mobile">
     <main class="mx-auto min-h-screen w-full max-w-md bg-zinc-950">
@@ -403,7 +403,7 @@
 
 
           <section class="app-view hidden" data-view="subscription">
-            <div class="panel subscription-page">
+            <div id="subscription-card" class="panel subscription-page">
               <p class="muted">Minha assinatura</p>
               <h3 id="subscription-title">Teste gratis</h3>
               <p id="subscription-copy" class="mt-2 text-sm text-zinc-400">Carregando acesso...</p>
@@ -415,6 +415,14 @@
                 <article class="info-card">
                   <span>Dias restantes</span>
                   <strong id="subscription-days-label">0</strong>
+                </article>
+                <article class="info-card">
+                  <span>Fim do teste</span>
+                  <strong id="subscription-trial-end">-</strong>
+                </article>
+                <article class="info-card">
+                  <span>Vencimento</span>
+                  <strong id="subscription-access-end">-</strong>
                 </article>
               </div>
               <span id="subscription-badge" class="subscription-badge mt-4 inline-block">...</span>
@@ -502,8 +510,8 @@
           <div id="toast-message" class="toast hidden" role="status"></div>
     </main>
 
-    <script src="/config.js?v=11"></script>
-    <script src="/app.js?v=11"></script>
+    <script src="/config.js?v=12"></script>
+    <script src="/app.js?v=12"></script>
   </body>
 </html>
 

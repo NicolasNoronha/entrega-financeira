@@ -509,6 +509,19 @@ select {
   min-height: 18rem;
 }
 
+.is-subscription-locked .bottom-nav {
+  grid-template-columns: 1fr;
+}
+
+.is-subscription-locked .nav-button:not([data-nav="subscription"]) {
+  display: none;
+}
+
+.is-subscription-locked .subscription-page {
+  border-color: rgba(251, 191, 36, 0.45);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.12), rgba(16, 185, 129, 0.04)), rgb(24 24 27);
+}
+
 .admin-body {
   min-height: 100vh;
   margin: 0;
