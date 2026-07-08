@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+
+.idea/
+.agents/
+
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/

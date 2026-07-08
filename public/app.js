@@ -1,0 +1,643 @@
+const state = {
+  token: localStorage.getItem('token'),
+  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  mode: 'login',
+  type: 'Receita',
+  view: 'dashboard',
+  vehicles: [],
+  transactions: [],
+  visibleTransactions: 10,
+  subscription: null
+};
+
+const categories = {
+  Receita: ['Rota', 'Shopee', 'Bonus', 'Diaria', 'Reembolso', 'Outros ganhos'],
+  Despesa: ['Combustivel', 'Manutencao', 'Alimentacao', 'Internet/Celular', 'Pedagio', 'Estacionamento', 'Multas', 'Lavagem', 'Equipamentos', 'Outros gastos']
+};
+
+const API_BASE_URL = (window.APP_CONFIG?.API_BASE_URL || `${window.location.origin}/api`).replace(/\/$/, '');
+
+function apiUrl(path) {
+  if (/^https?:\/\//.test(path)) return path;
+  if (path.startsWith('/api/')) return `${API_BASE_URL}${path.slice(4)}`;
+  if (path.startsWith('/')) return `${API_BASE_URL}${path}`;
+  return `${API_BASE_URL}/${path}`;
+}
+
+async function openExternalUrl(url) {
+  const capacitorBrowser = window.Capacitor?.Plugins?.Browser;
+
+  if (capacitorBrowser?.open) {
+    await capacitorBrowser.open({ url });
+    return;
+  }
+
+  window.location.href = url;
+}
+
+const api = {
+  async request(path, options = {}) {
+    const response = await fetch(apiUrl(path), {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
+        ...(options.headers || {})
+      }
+    });
+
+    if (response.status === 204) return null;
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Erro inesperado.');
+    }
+
+    return data;
+  }
+};
+
+const elements = {
+  authScreen: document.querySelector('#auth-screen'),
+  appScreen: document.querySelector('#app-screen'),
+  loginTab: document.querySelector('#login-tab'),
+  registerTab: document.querySelector('#register-tab'),
+  authTitle: document.querySelector('#auth-title'),
+  authCopy: document.querySelector('#auth-copy'),
+  authSubmit: document.querySelector('#auth-submit'),
+  nameField: document.querySelector('#name-field'),
+  authForm: document.querySelector('#auth-form'),
+  authMessage: document.querySelector('#auth-message'),
+  googleLogin: document.querySelector('#google-login'),
+  rememberEmail: document.querySelector('#remember-email'),
+  toast: document.querySelector('#toast-message'),
+  userName: document.querySelector('#user-name'),
+  logoutButton: document.querySelector('#logout-button'),
+  installButton: document.querySelector('#install-button'),
+  offlineBanner: document.querySelector('#offline-banner'),
+  transactionForm: document.querySelector('#transaction-form'),
+  transactionMessage: document.querySelector('#transaction-message'),
+  transactionList: document.querySelector('#transaction-list'),
+  transactionCount: document.querySelector('#transaction-count'),
+  showMoreTransactions: document.querySelector('#show-more-transactions'),
+  subscriptionCard: document.querySelector('#subscription-card'),
+  subscriptionTitle: document.querySelector('#subscription-title'),
+  subscriptionCopy: document.querySelector('#subscription-copy'),
+  subscriptionBadge: document.querySelector('#subscription-badge'),
+  subscriptionStatusLabel: document.querySelector('#subscription-status-label'),
+  subscriptionDaysLabel: document.querySelector('#subscription-days-label'),
+  renewSubscription: document.querySelector('#renew-subscription'),
+  category: document.querySelector('#category'),
+  reportCategory: document.querySelector('#report-category'),
+  transactionVehicle: document.querySelector('#transaction-vehicle'),
+  reportVehicle: document.querySelector('#report-vehicle'),
+  expenseShortcuts: document.querySelector('#expense-shortcuts'),
+  date: document.querySelector('#date'),
+  kmStart: document.querySelector('#km-start'),
+  kmEnd: document.querySelector('#km-end'),
+  kmTotal: document.querySelector('#km-total'),
+  reportForm: document.querySelector('#report-form'),
+  vehicleForm: document.querySelector('#vehicle-form'),
+  vehicleList: document.querySelector('#vehicle-list'),
+  vehicleCount: document.querySelector('#vehicle-count'),
+  vehicleMessage: document.querySelector('#vehicle-message'),
+  simulatorForm: document.querySelector('#simulator-form'),
+  routeKmFields: document.querySelector('#route-km-fields'),
+  routeFields: document.querySelector('#route-fields'),
+  packageVehicleFields: document.querySelector('#package-vehicle-fields')
+};
+
+let deferredInstallPrompt = null;
+
+const currency = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+function showToast(message, type = 'success') {
+  if (!elements.toast) return;
+  elements.toast.textContent = message;
+  elements.toast.classList.remove('hidden', 'toast-success', 'toast-error');
+  elements.toast.classList.add(type === 'error' ? 'toast-error' : 'toast-success');
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => {
+    elements.toast.classList.add('hidden');
+  }, 2800);
+}
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatKm(value) {
+  return Number(value || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+}
+
+function setText(selector, value) {
+  const element = document.querySelector(selector);
+  if (element) element.textContent = value;
+}
+
+function fillSelect(select, options, placeholder = null) {
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  if (placeholder) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    select.appendChild(option);
+  }
+
+  options.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item.value ?? item;
+    option.textContent = item.label ?? item;
+    select.appendChild(option);
+  });
+}
+
+function updateCategorySelects() {
+  fillSelect(elements.category, categories[state.type]);
+  fillSelect(elements.reportCategory, [...categories.Receita, ...categories.Despesa], 'Todas');
+}
+
+function updateVehicleSelects() {
+  const vehicleOptions = state.vehicles.map((vehicle) => ({
+    value: vehicle.id,
+    label: `${vehicle.modelo}${vehicle.placa ? ` - ${vehicle.placa}` : ''}`
+  }));
+
+  fillSelect(elements.transactionVehicle, vehicleOptions, 'Sem veiculo');
+  fillSelect(elements.reportVehicle, vehicleOptions, 'Todos');
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  elements.loginTab.classList.toggle('active', mode === 'login');
+  elements.registerTab.classList.toggle('active', mode === 'register');
+  elements.nameField.classList.toggle('hidden', mode === 'login');
+  elements.authTitle.textContent = mode === 'login' ? 'Acessar painel' : 'Criar conta';
+  elements.authCopy.textContent = mode === 'login'
+    ? 'Veja lucro, km e despesas sem abrir planilha.'
+    : 'Cadastre seus dados para comecar a registrar receitas e despesas.';
+  elements.authSubmit.textContent = mode === 'login' ? 'Entrar' : 'Criar conta';
+  document.querySelector('#password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  elements.authMessage.textContent = '';
+}
+
+function showApp() {
+  elements.authScreen.classList.toggle('hidden', Boolean(state.token));
+  elements.appScreen.classList.toggle('hidden', !state.token);
+  elements.userName.textContent = state.user?.nome || 'Entregador';
+}
+
+function persistSession({ token, user }) {
+  state.token = token;
+  state.user = user;
+  localStorage.setItem('token', token);
+  localStorage.setItem('user', JSON.stringify(user));
+}
+
+function clearSession() {
+  state.token = null;
+  state.user = null;
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  showApp();
+}
+
+function setTransactionType(type) {
+  state.type = type;
+  document.querySelectorAll('.type-button').forEach((item) => {
+    item.classList.toggle('active', item.dataset.type === type);
+  });
+  elements.expenseShortcuts.classList.toggle('hidden', type !== 'Despesa');
+  elements.routeKmFields?.classList.toggle('hidden', type !== 'Receita');
+  updateCategorySelects();
+}
+
+function setView(view) {
+  state.view = view;
+  const viewExists = Boolean(document.querySelector(`.app-view[data-view="${view}"]`));
+  const nextView = viewExists ? view : 'dashboard';
+  state.view = nextView;
+
+  document.querySelectorAll('.app-view').forEach((section) => {
+    section.classList.toggle('hidden', section.dataset.view !== nextView);
+  });
+  document.querySelectorAll('.nav-button').forEach((button) => {
+    button.classList.toggle('active', button.dataset.nav === nextView);
+  });
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+}
+
+function renderSubscription() {
+  const sub = state.subscription;
+  if (!sub || !elements.subscriptionCard) return;
+
+  elements.subscriptionCard.classList.remove('hidden');
+  elements.subscriptionTitle.textContent = sub.subscription_status === 'trial'
+    ? 'Teste gratis ativo'
+    : sub.subscription_status === 'active'
+      ? 'Assinatura ativa'
+      : 'Assinatura pendente';
+  elements.subscriptionCopy.textContent = sub.is_active
+    ? `Seu acesso vence em ${formatDate(sub.access_expires_at)} (${sub.days_remaining} dias).`
+    : 'Seu acesso expirou. Renove para continuar usando o app.';
+  elements.subscriptionBadge.textContent = sub.days_remaining <= 3 ? 'Vence em breve' : sub.subscription_status;
+  elements.subscriptionBadge.classList.toggle('badge-warning', sub.days_remaining <= 3);
+
+  if (sub.days_remaining <= 3) {
+    showToast(`Sua assinatura vence em ${sub.days_remaining} dias.`, 'error');
+  }
+}
+
+async function loadSubscription() {
+  const data = await api.request('/api/subscription/status');
+  state.subscription = data.subscription;
+  renderSubscription();
+}
+async function loadDashboard() {
+  const data = await api.request('/api/transactions/dashboard?period=mes');
+  const summary = data.summary;
+
+  setText('#today-revenue', currency.format(summary.receita_hoje));
+  setText('#today-expense', currency.format(summary.despesa_hoje));
+  setText('#today-profit', currency.format(summary.lucro_hoje));
+  setText('#month-revenue', currency.format(summary.receita_mes));
+  setText('#month-expense', currency.format(summary.despesa_mes));
+  setText('#month-profit', currency.format(summary.lucro_mes));
+  setText('#month-km', formatKm(summary.km_mes));
+  setText('#profit-km', currency.format(summary.lucro_por_km));
+  setText('#cost-km', currency.format(summary.gasto_por_km));
+  document.querySelector('#alert-box').classList.toggle('hidden', !summary.alerta_despesa);
+
+  renderBars('#category-summary', summary.gastos_por_categoria, 'Sem despesas no mes.');
+}
+
+function transactionTemplate(transaction) {
+  const valueClass = transaction.tipo === 'Receita' ? 'text-emerald-300' : 'text-rose-300';
+  const packages = transaction.quantidade_pacotes ? ` - ${transaction.quantidade_pacotes} pacotes` : '';
+  const route = transaction.rota_nome ? ` - ${transaction.rota_nome}` : '';
+  const km = transaction.km_total ? ` - ${formatKm(transaction.km_total)} km` : '';
+
+  return `
+    <article class="transaction-item">
+      <div>
+        <strong>${transaction.descricao}</strong>
+        <span>${new Date(transaction.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${transaction.categoria || 'Sem categoria'}${route}${packages}${km}</span>
+      </div>
+      <div class="text-right">
+        <strong class="${valueClass}">${currency.format(Number(transaction.valor))}</strong>
+        <button class="delete-button mt-2" data-delete="${transaction.id}" type="button" aria-label="Excluir">x</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadTransactions() {
+  const data = await api.request('/api/transactions?period=mes');
+  elements.transactionList.innerHTML = data.transactions.slice(0, 8).map(transactionTemplate).join('');
+  elements.transactionCount.textContent = `${data.transactions.length} itens`;
+}
+
+async function loadVehicles() {
+  const data = await api.request('/api/vehicles');
+  state.vehicles = data.vehicles;
+  updateVehicleSelects();
+  renderVehicles();
+}
+
+function renderVehicles() {
+  elements.vehicleCount.textContent = `${state.vehicles.length} itens`;
+  elements.vehicleList.innerHTML = state.vehicles.map((vehicle) => `
+    <article class="list-item">
+      <div>
+        <strong>${vehicle.modelo}</strong>
+        <span>${vehicle.tipo}${vehicle.placa ? ` - ${vehicle.placa}` : ''} - ${vehicle.consumo_medio || 0} km/L</span>
+      </div>
+      <button class="delete-button" data-delete-vehicle="${vehicle.id}" type="button" aria-label="Excluir">x</button>
+    </article>
+  `).join('');
+}
+
+function renderBars(selector, items, emptyText) {
+  const container = document.querySelector(selector);
+  if (!items || items.length === 0) {
+    container.innerHTML = `<p class="text-sm text-zinc-400">${emptyText}</p>`;
+    return;
+  }
+
+  const max = Math.max(...items.map((item) => Number(item.total || item.lucro || 0)), 1);
+  container.innerHTML = items.map((item) => {
+    const total = Number(item.total ?? item.lucro ?? 0);
+    const width = Math.max((total / max) * 100, 4);
+    return `
+      <div class="bar-row">
+        <div class="flex items-center justify-between gap-2 text-sm">
+          <strong class="text-zinc-100">${item.categoria || item.rota}</strong>
+          <span class="text-zinc-400">${currency.format(total)}</span>
+        </div>
+        <div class="bar-line"><span style="width:${width}%"></span></div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function refresh() {
+  await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles(), loadSubscription()]);
+}
+
+async function loadReport(event) {
+  if (event) event.preventDefault();
+
+  const params = new URLSearchParams();
+  const startDate = document.querySelector('#report-start').value;
+  const endDate = document.querySelector('#report-end').value;
+  const category = elements.reportCategory.value;
+  const vehicle = elements.reportVehicle.value;
+  const route = document.querySelector('#report-route').value;
+
+  if (startDate && endDate) {
+    params.set('startDate', startDate);
+    params.set('endDate', endDate);
+  } else {
+    params.set('period', 'mes');
+  }
+  if (category) params.set('categoria', category);
+  if (vehicle) params.set('veiculo_id', vehicle);
+  if (route) params.set('rota', route);
+
+  const report = await api.request(`/api/transactions/reports?${params.toString()}`);
+  const summary = report.summary;
+
+  setText('#report-revenue', currency.format(summary.receita_total));
+  setText('#report-expense', currency.format(summary.despesa_total));
+  setText('#report-profit', currency.format(summary.lucro_liquido));
+  setText('#report-daily-average', currency.format(summary.media_lucro_por_dia));
+  setText('#report-km', formatKm(summary.km_total));
+  renderBars('#report-categories', report.despesas_por_categoria, 'Sem despesas no periodo.');
+  renderBars('#report-routes', report.lucro_por_rota, 'Sem rotas no periodo.');
+}
+
+function updateKmTotal() {
+  const start = Number(elements.kmStart.value || 0);
+  const end = Number(elements.kmEnd.value || 0);
+  elements.kmTotal.value = end > start ? (end - start).toFixed(1) : '';
+}
+
+elements.loginTab.addEventListener('click', () => setMode('login'));
+elements.googleLogin?.addEventListener('click', () => {
+  if (!window.APP_CONFIG?.GOOGLE_CLIENT_ID) {
+    showToast('Login Google precisa configurar o Client ID.', 'error');
+    return;
+  }
+  showToast('Login Google em configuracao.', 'error');
+});
+elements.registerTab.addEventListener('click', () => setMode('register'));
+
+elements.authForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  elements.authMessage.textContent = '';
+
+  const body = {
+    email: document.querySelector('#email').value,
+    senha: document.querySelector('#password').value
+  };
+
+  if (state.mode === 'register') {
+    body.nome = document.querySelector('#name').value;
+  }
+
+  try {
+    const endpoint = state.mode === 'register' ? '/api/auth/register' : '/api/auth/login';
+    const data = await api.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+
+    persistSession(data);
+    showApp();
+    await refresh();
+    await loadReport();
+  } catch (error) {
+    elements.authMessage.textContent = error.message;
+  }
+});
+
+document.querySelectorAll('.type-button').forEach((button) => {
+  button.addEventListener('click', () => setTransactionType(button.dataset.type));
+});
+
+document.addEventListener('click', (event) => {
+  const navButton = event.target.closest('[data-nav]');
+  if (!navButton) return;
+
+  event.preventDefault();
+  setView(navButton.dataset.nav);
+});
+
+document.querySelectorAll('.shortcut-button').forEach((button) => {
+  button.addEventListener('click', () => {
+    setTransactionType('Despesa');
+    document.querySelector('#description').value = '';
+    document.querySelector('#amount').value = button.dataset.value;
+    elements.category.value = button.dataset.category;
+  });
+});
+
+elements.kmStart.addEventListener('input', updateKmTotal);
+elements.kmEnd.addEventListener('input', updateKmTotal);
+
+elements.transactionForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  elements.transactionMessage.textContent = '';
+
+  const body = {
+    tipo: state.type,
+    valor: document.querySelector('#amount').value,
+    data: document.querySelector('#date').value,
+    categoria: elements.category.value,
+    descricao: document.querySelector('#description').value || elements.category.value || state.type,
+    rota_nome: document.querySelector('#route-name').value,
+    periodo: document.querySelector('#period-shift').value || null,
+    quantidade_pacotes: document.querySelector('#packages').value || null,
+    veiculo_id: elements.transactionVehicle.value || null,
+    km_inicial: elements.kmStart.value || null,
+    km_final: elements.kmEnd.value || null,
+    km_total: elements.kmTotal.value || null
+  };
+
+  try {
+    await api.request('/api/transactions', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    elements.transactionForm.reset();
+    elements.date.value = today();
+    setTransactionType('Receita');
+    elements.transactionMessage.textContent = 'Lancamento salvo.';
+    showToast('Lancamento realizado com sucesso.');
+    await refresh();
+  } catch (error) {
+    elements.transactionMessage.textContent = error.message;
+  }
+});
+
+elements.showMoreTransactions?.addEventListener('click', () => {
+  state.visibleTransactions += 10;
+  renderTransactions();
+});
+
+elements.transactionList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-delete]');
+  if (!button) return;
+
+  await api.request(`/api/transactions/${button.dataset.delete}`, { method: 'DELETE' });
+  await refresh();
+});
+
+elements.reportForm.addEventListener('submit', loadReport);
+
+elements.vehicleForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  elements.vehicleMessage.textContent = '';
+
+  const body = {
+    tipo: document.querySelector('#vehicle-type').value,
+    modelo: document.querySelector('#vehicle-model').value,
+    placa: document.querySelector('#vehicle-plate').value,
+    consumo_medio: document.querySelector('#vehicle-consumption').value || null,
+    tipo_combustivel: document.querySelector('#vehicle-fuel-type').value,
+    valor_medio_combustivel: document.querySelector('#vehicle-fuel-price').value || null
+  };
+
+  try {
+    await api.request('/api/vehicles', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    elements.vehicleForm.reset();
+    elements.vehicleMessage.textContent = 'Veiculo salvo.';
+    showToast('Veiculo cadastrado com sucesso.');
+    await loadVehicles();
+  } catch (error) {
+    elements.vehicleMessage.textContent = error.message;
+  }
+});
+
+elements.vehicleList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-delete-vehicle]');
+  if (!button) return;
+
+  await api.request(`/api/vehicles/${button.dataset.deleteVehicle}`, { method: 'DELETE' });
+  await loadVehicles();
+});
+
+elements.simulatorForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const packages = Number(document.querySelector('#sim-packages').value || 0);
+  const packageRate = Number(document.querySelector('#sim-package-rate').value || 0);
+  const km = Number(document.querySelector('#sim-km').value || 0);
+  const toll = Number(document.querySelector('#sim-toll').value || 0);
+  const consumption = Number(document.querySelector('#sim-consumption').value || 0);
+  const fuelPrice = Number(document.querySelector('#sim-fuel-price').value || 0);
+  const extraCost = Number(document.querySelector('#sim-extra-cost').value || 0);
+  const grossRevenue = (packages * packageRate) + toll;
+  const fuelCost = consumption > 0 ? (km / consumption) * fuelPrice : 0;
+  const profit = grossRevenue - fuelCost - extraCost;
+  const revenueKm = km > 0 ? grossRevenue / km : 0;
+  const profitPackage = packages > 0 ? profit / packages : 0;
+
+  setText('#sim-gross-revenue', currency.format(grossRevenue));
+  setText('#sim-fuel-cost', currency.format(fuelCost));
+  setText('#sim-profit', currency.format(profit));
+  setText('#sim-revenue-km', currency.format(revenueKm));
+  setText('#sim-profit-package', currency.format(profitPackage));
+
+  const decision = document.querySelector('#sim-decision');
+  const goodRoute = profit > 0 && profitPackage >= 1.5 && revenueKm >= 1.2;
+  decision.textContent = goodRoute
+    ? 'Vale a pena: lucro por pacote e receita por km estao saudaveis.'
+    : 'Atencao: margem apertada. Ajuste valor por pacote, km ou custos antes de aceitar.';
+  decision.className = goodRoute
+    ? 'mt-3 rounded-lg border border-emerald-400/40 bg-emerald-950/40 p-3 text-sm text-emerald-100'
+    : 'mt-3 rounded-lg border border-amber-400/40 bg-amber-950/40 p-3 text-sm text-amber-100';
+});
+
+
+elements.renewSubscription?.addEventListener('click', async () => {
+  try {
+    const data = await api.request('/api/subscription/renew', {
+      method: 'POST',
+      body: JSON.stringify({ amount: 1, days: 30 })
+    });
+
+    if (data.payment_url) {
+      await openExternalUrl(data.payment_url);
+      return;
+    }
+
+    showToast(data.message || 'Pagamento criado.');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+});
+elements.logoutButton.addEventListener('click', clearSession);
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  elements.installButton.classList.remove('hidden');
+});
+
+elements.installButton.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  elements.installButton.classList.add('hidden');
+});
+
+function updateConnectionStatus() {
+  elements.offlineBanner.classList.toggle('hidden', navigator.onLine);
+}
+
+window.addEventListener('online', updateConnectionStatus);
+window.addEventListener('offline', updateConnectionStatus);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js?v=10').catch(() => {});
+  });
+}
+
+const rememberedEmail = localStorage.getItem('remembered_email');
+if (rememberedEmail) {
+  document.querySelector('#email').value = rememberedEmail;
+}
+
+elements.date.value = today();
+document.querySelector('#report-start').value = today().slice(0, 8) + '01';
+document.querySelector('#report-end').value = today();
+updateConnectionStatus();
+setMode('login');
+setTransactionType('Receita');
+setView('dashboard');
+updateCategorySelects();
+showApp();
+
+if (state.token) {
+  refresh()
+    .then(loadReport)
+    .catch(clearSession);
+}
+
+
+

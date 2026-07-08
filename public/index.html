@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10b981">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Entrega Financeira">
+    <title>Entrega Financeira</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/icon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/styles.css?v=10">
+  </head>
+  <body class="min-h-screen bg-zinc-950 text-zinc-100 app-mobile">
+    <main class="mx-auto min-h-screen w-full max-w-md bg-zinc-950">
+      <section id="auth-screen" class="flex min-h-screen flex-col justify-between p-5">
+        <div class="auth-hero pt-8">
+          <div class="brand-mark">
+            <img src="/icons/icon.svg" alt="">
+          </div>
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">Entrega Financeira</p>
+          <h1 class="mt-3 text-4xl font-black leading-tight text-white">Controle financeiro para entregadores.</h1>
+          <p class="mt-3 text-sm leading-6 text-zinc-300">Registre ganhos, despesas e rotas com rapidez no celular.</p>
+          <div class="auth-benefits mt-5">
+            <span>Lucro diario</span>
+            <span>Km e veiculo</span>
+            <span>Simulador</span>
+          </div>
+        </div>
+
+        <div class="auth-panel">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Acesso do entregador</p>
+              <h2 id="auth-title" class="mt-1 text-2xl font-black text-white">Acessar painel</h2>
+              <p id="auth-copy" class="mt-1 text-sm leading-5 text-zinc-400">Veja lucro, km e despesas sem abrir planilha.</p>
+            </div>
+            <img class="h-12 w-12 rounded-lg border border-zinc-800" src="/icons/icon.svg" alt="">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 rounded-lg bg-zinc-950 p-1">
+            <button id="login-tab" class="tab-button active" type="button">Entrar</button>
+            <button id="register-tab" class="tab-button" type="button">Cadastrar</button>
+          </div>
+
+          <form id="auth-form" class="mt-4 space-y-3">
+            <button id="google-login" class="google-button w-full" type="button">
+              <span>G</span>
+              Entrar com Google
+            </button>
+            <div class="auth-divider"><span>ou acesse com e-mail</span></div>
+            <label id="name-field" class="hidden">
+              <span>Nome</span>
+              <input id="name" autocomplete="name" placeholder="Ex: Nicolas">
+            </label>
+            <label>
+              <span>Email</span>
+              <input id="email" type="email" autocomplete="email" placeholder="seu@email.com" required>
+            </label>
+            <label>
+              <span>Senha</span>
+              <input id="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+            </label>
+                        <label class="remember-row">
+              <input id="remember-email" type="checkbox" checked>
+              <span>Salvar e-mail neste aparelho</span>
+            </label>
+            <button id="auth-submit" class="primary-button w-full" type="submit">Entrar</button>
+            <p id="auth-message" class="min-h-5 text-sm text-rose-300"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="app-screen" class="hidden min-h-screen pb-24">
+        <header class="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Entrega Financeira</p>
+              <h2 id="user-name" class="text-xl font-black text-white">Entregador</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="install-button" class="secondary-button hidden" type="button">Instalar</button>
+              <button id="logout-button" class="secondary-button" type="button">Sair</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="space-y-5 p-4">
+          <div id="offline-banner" class="hidden rounded-lg border border-amber-400/40 bg-amber-950/40 p-3 text-sm text-amber-100">
+            Voce esta offline. A tela continua aberta, mas novos lancamentos precisam de internet.
+          </div>
+
+          <section class="app-view" data-view="dashboard">
+            <div class="grid grid-cols-3 gap-2">
+              <article class="metric-card">
+                <span>Receita hoje</span>
+                <strong id="today-revenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Despesa hoje</span>
+                <strong id="today-expense">R$ 0,00</strong>
+              </article>
+              <article class="metric-card border-emerald-500/40 bg-emerald-950/30">
+                <span>Lucro hoje</span>
+                <strong id="today-profit">R$ 0,00</strong>
+              </article>
+            </div>
+
+            <div id="alert-box" class="mt-3 hidden rounded-lg border border-amber-400/40 bg-amber-950/40 p-3 text-sm text-amber-100">
+              Despesa de hoje acima de 40% da receita.
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <article class="metric-card">
+                <span>Receita mes</span>
+                <strong id="month-revenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Despesa mes</span>
+                <strong id="month-expense">R$ 0,00</strong>
+              </article>
+              <article class="metric-card col-span-2 border-emerald-500/40 bg-emerald-950/30">
+                <span>Lucro mes</span>
+                <strong id="month-profit">R$ 0,00</strong>
+              </article>
+            </div>
+
+            <div class="mt-4 grid grid-cols-3 gap-2">
+              <article class="info-card">
+                <span>Km mes</span>
+                <strong id="month-km">0</strong>
+              </article>
+              <article class="info-card">
+                <span>Lucro/km</span>
+                <strong id="profit-km">R$ 0,00</strong>
+              </article>
+              <article class="info-card">
+                <span>Gasto/km</span>
+                <strong id="cost-km">R$ 0,00</strong>
+              </article>
+            </div>
+
+            <section class="panel mt-4">
+              <div class="mb-3 flex items-center justify-between">
+                <h3>Gastos por categoria</h3>
+                <span class="muted">Mes atual</span>
+              </div>
+              <div id="category-summary" class="space-y-2"></div>
+            </section>
+
+            <section class="mt-5">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-black">Ultimos lancamentos</h3>
+                <span id="transaction-count" class="text-sm text-zinc-400">0 itens</span>
+              </div>
+              <div id="transaction-list" class="space-y-2"></div>
+              <button id="show-more-transactions" class="secondary-button mt-3 hidden w-full" type="button">Mostrar mais</button>
+            </section>
+          </section>
+
+          <section class="app-view hidden" data-view="entry">
+            <div class="panel">
+              <div class="mb-3 grid grid-cols-2 gap-2">
+                <button class="type-button active" data-type="Receita" type="button">Receita</button>
+                <button class="type-button" data-type="Despesa" type="button">Despesa</button>
+              </div>
+
+              <div id="expense-shortcuts" class="hidden mb-3">
+                <div class="shortcut-strip">
+                  <button class="shortcut-button" data-desc="Combustivel" data-category="Combustivel" data-value="50" type="button">Combustivel</button>
+                  <button class="shortcut-button" data-desc="Pedagio" data-category="Pedagio" data-value="12" type="button">Pedagio</button>
+                  <button class="shortcut-button" data-desc="Manutencao" data-category="Manutencao" data-value="35" type="button">Manutencao</button>
+                  <button class="shortcut-button" data-desc="Estacionamento" data-category="Estacionamento" data-value="10" type="button">Estacionamento</button>
+                </div>
+              </div>
+
+              <form id="transaction-form" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Valor</span>
+                    <input id="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00" required>
+                  </label>
+                  <label>
+                    <span>Data</span>
+                    <input id="date" type="date" required>
+                  </label>
+                </div>
+
+                <label>
+                  <span>Categoria</span>
+                  <select id="category"></select>
+                </label>
+
+                <label>
+                  <span>Observacao opcional</span>
+                  <input id="description" placeholder="Opcional: rota, cliente, detalhe">
+                </label>
+
+                <div id="route-fields" class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Rota</span>
+                    <input id="route-name" placeholder="Nome ou codigo">
+                  </label>
+                  <label>
+                    <span>Periodo</span>
+                    <select id="period-shift">
+                      <option value="">Nao informar</option>
+                      <option value="Manha">Manha</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noite">Noite</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div id="package-vehicle-fields" class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Pacotes</span>
+                    <input id="packages" type="number" min="0" step="1" inputmode="numeric" placeholder="Opcional">
+                  </label>
+                  <label>
+                    <span>Veiculo</span>
+                    <select id="transaction-vehicle"></select>
+                  </label>
+                </div>
+
+                <div id="route-km-fields" class="grid grid-cols-3 gap-2">
+                  <label>
+                    <span>Km inicial</span>
+                    <input id="km-start" type="number" min="0" step="0.1" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span>Km final</span>
+                    <input id="km-end" type="number" min="0" step="0.1" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span>Km total</span>
+                    <input id="km-total" type="number" min="0" step="0.1" inputmode="decimal" readonly>
+                  </label>
+                </div>
+
+
+                <button class="primary-button w-full" type="submit">Salvar lancamento</button>
+                <p id="transaction-message" class="min-h-5 text-sm text-emerald-300"></p>
+              </form>
+            </div>
+          </section>
+
+          <section class="app-view hidden" data-view="reports">
+            <div class="panel">
+              <h3>Relatorios</h3>
+              <form id="report-form" class="mt-3 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Data inicial</span>
+                    <input id="report-start" type="date">
+                  </label>
+                  <label>
+                    <span>Data final</span>
+                    <input id="report-end" type="date">
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Categoria</span>
+                    <select id="report-category"></select>
+                  </label>
+                  <label>
+                    <span>Veiculo</span>
+                    <select id="report-vehicle"></select>
+                  </label>
+                </div>
+                <label>
+                  <span>Rota</span>
+                  <input id="report-route" placeholder="Filtrar por rota">
+                </label>
+                <button class="primary-button w-full" type="submit">Gerar relatorio</button>
+              </form>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <article class="metric-card">
+                <span>Receitas</span>
+                <strong id="report-revenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Despesas</span>
+                <strong id="report-expense">R$ 0,00</strong>
+              </article>
+              <article class="metric-card col-span-2 border-emerald-500/40 bg-emerald-950/30">
+                <span>Lucro periodo</span>
+                <strong id="report-profit">R$ 0,00</strong>
+              </article>
+              <article class="info-card">
+                <span>Media/dia</span>
+                <strong id="report-daily-average">R$ 0,00</strong>
+              </article>
+              <article class="info-card">
+                <span>Km periodo</span>
+                <strong id="report-km">0</strong>
+              </article>
+            </div>
+
+            <section class="panel mt-4">
+              <h3>Despesas por categoria</h3>
+              <div id="report-categories" class="mt-3 space-y-2"></div>
+            </section>
+
+            <section class="panel mt-4">
+              <h3>Lucro por rota</h3>
+              <div id="report-routes" class="mt-3 space-y-2"></div>
+            </section>
+          </section>
+
+          <section class="app-view hidden" data-view="simulator">
+            <div class="panel simulator-panel">
+              <div class="section-title">
+                <div>
+                  <p>Simulador</p>
+                  <h3>Vale a pena pegar essa rota?</h3>
+                </div>
+              </div>
+              <form id="simulator-form" class="mt-3 space-y-3">
+                <label>
+                  <span>Plataforma</span>
+                  <input id="sim-platform" list="platform-options" placeholder="Ex: Shopee, Mercado Livre, Imile">
+                  <datalist id="platform-options">
+                    <option value="Shopee"></option>
+                    <option value="Mercado Livre"></option>
+                    <option value="Imile"></option>
+                    <option value="Amazon"></option>
+                    <option value="Loggi"></option>
+                    <option value="Lalamove"></option>
+                    <option value="Outra"></option>
+                  </datalist>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Pacotes</span>
+                    <input id="sim-packages" type="number" min="0" step="1" inputmode="numeric" placeholder="Ex: 60">
+                  </label>
+                  <label>
+                    <span>Valor por pacote</span>
+                    <input id="sim-package-rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex: 2,50">
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Km estimado</span>
+                    <input id="sim-km" type="number" min="0" step="0.1" inputmode="decimal">
+                  </label>
+                  <label>
+                    <span>Pedagio/reembolso</span>
+                    <input id="sim-toll" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Consumo medio</span>
+                    <input id="sim-consumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="Km/L">
+                  </label>
+                  <label>
+                    <span>Preco combustivel</span>
+                    <input id="sim-fuel-price" type="number" min="0" step="0.01" inputmode="decimal">
+                  </label>
+                </div>
+                <label>
+                  <span>Outras despesas</span>
+                  <input id="sim-extra-cost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Alimentacao, estacionamento...">
+                </label>
+                <button class="primary-button w-full" type="submit">Calcular rota</button>
+              </form>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <article class="metric-card">
+                <span>Receita estimada</span>
+                <strong id="sim-gross-revenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Custo combustivel</span>
+                <strong id="sim-fuel-cost">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Receita/km</span>
+                <strong id="sim-revenue-km">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span>Lucro/pacote</span>
+                <strong id="sim-profit-package">R$ 0,00</strong>
+              </article>
+              <article class="metric-card col-span-2 border-emerald-500/40 bg-emerald-950/30">
+                <span>Lucro estimado</span>
+                <strong id="sim-profit">R$ 0,00</strong>
+              </article>
+            </div>
+            <div id="sim-decision" class="mt-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-sm text-zinc-300">
+              Informe pacotes, km e combustivel para avaliar.
+            </div>
+          </section>
+
+
+          <section class="app-view hidden" data-view="subscription">
+            <div class="panel subscription-page">
+              <p class="muted">Minha assinatura</p>
+              <h3 id="subscription-title">Teste gratis</h3>
+              <p id="subscription-copy" class="mt-2 text-sm text-zinc-400">Carregando acesso...</p>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <article class="info-card">
+                  <span>Status</span>
+                  <strong id="subscription-status-label">-</strong>
+                </article>
+                <article class="info-card">
+                  <span>Dias restantes</span>
+                  <strong id="subscription-days-label">0</strong>
+                </article>
+              </div>
+              <span id="subscription-badge" class="subscription-badge mt-4 inline-block">...</span>
+              <button id="renew-subscription" class="primary-button mt-4 w-full" type="button">Renovar por 30 dias</button>
+            </div>
+          </section>
+          <section class="app-view hidden" data-view="vehicle">
+            <div class="panel">
+              <h3>Veiculo</h3>
+              <form id="vehicle-form" class="mt-3 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Tipo</span>
+                    <select id="vehicle-type">
+                      <option value="Moto">Moto</option>
+                      <option value="Carro">Carro</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Modelo</span>
+                    <input id="vehicle-model" placeholder="Ex: Honda CG 160" required>
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Placa</span>
+                    <input id="vehicle-plate" placeholder="Opcional">
+                  </label>
+                  <label>
+                    <span>Combustivel</span>
+                    <select id="vehicle-fuel-type"><option value="Gasolina">Gasolina</option><option value="Etanol">Etanol</option><option value="Flex">Flex</option><option value="Diesel S10">Diesel S10</option><option value="Diesel comum">Diesel comum</option><option value="GNV">GNV</option><option value="Eletrico">Eletrico</option><option value="Hibrido">Hibrido</option><option value="Outro">Outro</option></select>
+                  </label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label>
+                    <span>Consumo medio</span>
+                    <input id="vehicle-consumption" type="number" min="0" step="0.1" inputmode="decimal" placeholder="Km/L">
+                  </label>
+                  <label>
+                    <span>Valor medio</span>
+                    <input id="vehicle-fuel-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="R$/L">
+                  </label>
+                </div>
+                <button class="primary-button w-full" type="submit">Salvar veiculo</button>
+                <p id="vehicle-message" class="min-h-5 text-sm text-emerald-300"></p>
+              </form>
+            </div>
+
+            <section class="mt-4">
+              <div class="mb-3 flex items-center justify-between">
+                <h3 class="text-lg font-black">Veiculos cadastrados</h3>
+                <span id="vehicle-count" class="text-sm text-zinc-400">0 itens</span>
+              </div>
+              <div id="vehicle-list" class="space-y-2"></div>
+            </section>
+          </section>
+        </div>
+
+        <nav class="bottom-nav" aria-label="Menu principal">
+          <button class="nav-button active" data-nav="dashboard" type="button" aria-label="Abrir painel">
+            <span class="nav-icon">P</span>
+            <span>Painel</span>
+          </button>
+          <button class="nav-button" data-nav="entry" type="button" aria-label="Abrir lancamentos">
+            <span class="nav-icon">+</span>
+            <span>Lancar</span>
+          </button>
+          <button class="nav-button" data-nav="reports" type="button" aria-label="Abrir relatorios">
+            <span class="nav-icon">R</span>
+            <span>Relatorios</span>
+          </button>
+          <button class="nav-button" data-nav="simulator" type="button" aria-label="Abrir simulador">
+            <span class="nav-icon">S</span>
+            <span>Simular</span>
+          </button>
+          <button class="nav-button" data-nav="subscription" type="button" aria-label="Abrir assinatura">
+            <span class="nav-icon">A</span>
+            <span>Plano</span>
+          </button>
+          <button class="nav-button" data-nav="vehicle" type="button" aria-label="Abrir veiculos">
+            <span class="nav-icon">V</span>
+            <span>Veiculo</span>
+          </button>        </nav>
+      </section>
+          <div id="toast-message" class="toast hidden" role="status"></div>
+    </main>
+
+    <script src="/config.js?v=10"></script>
+    <script src="/app.js?v=10"></script>
+  </body>
+</html>
+

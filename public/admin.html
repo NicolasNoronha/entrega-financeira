@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Entrega Financeira</title>
+    <link rel="stylesheet" href="/styles.css?v=10">
+  </head>
+  <body class="admin-body">
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <p>Entrega Financeira</p>
+          <h1>Gestao de assinaturas</h1>
+          <span>Controle teste gratis, ativos, cancelados e vencimentos.</span>
+        </div>
+        <a class="admin-link" href="/">Abrir app</a>
+      </header>
+
+      <section id="admin-login" class="admin-card admin-login-card">
+        <h2>Entrar como admin</h2>
+        <form id="admin-login-form" class="admin-form">
+          <label>Email<input id="admin-email" type="email" required></label>
+          <label>Senha<input id="admin-password" type="password" required></label>
+          <button class="admin-primary" type="submit">Entrar</button>
+          <p id="admin-login-message" class="admin-error"></p>
+        </form>
+      </section>
+
+      <section id="admin-panel" class="hidden">
+        <section class="admin-stats">
+          <article><span>Ativos</span><strong id="count-active">0</strong></article>
+          <article><span>Trial</span><strong id="count-trial">0</strong></article>
+          <article><span>Expirando</span><strong id="count-expiring">0</strong></article>
+          <article><span>Total</span><strong id="count-total">0</strong></article>
+        </section>
+
+        <section class="admin-toolbar">
+          <div class="admin-filters">
+            <button class="active" data-admin-filter="" type="button">Todos</button>
+            <button data-admin-filter="active" type="button">Ativos</button>
+            <button data-admin-filter="trial" type="button">Teste</button>
+            <button data-admin-filter="canceled" type="button">Cancelados</button>
+          </div>
+        </section>
+
+        <section id="admin-users" class="admin-users"></section>
+      </section>
+    </main>
+
+    <div id="toast-message" class="toast hidden" role="status"></div>
+    <script src="/config.js?v=10"></script>
+    <script src="/admin.js?v=10"></script>
+  </body>
+</html>

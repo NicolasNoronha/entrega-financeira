@@ -1,0 +1,27 @@
+{
+  "name": "Entrega Financeira",
+  "short_name": "Entregas",
+  "description": "Controle financeiro mobile para entregadores autonomos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#10b981",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Abrir painel",
+      "short_name": "Painel",
+      "url": "/"
+    }
+  ]
+}
