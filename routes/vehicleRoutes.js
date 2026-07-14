@@ -10,6 +10,7 @@ router.use(subscriptionAccess);
 
 router.get('/', vehicleController.index);
 router.post('/', vehicleController.create);
+router.put('/:id', vehicleController.update);
 router.delete('/:id', vehicleController.remove);
 
 module.exports = router;

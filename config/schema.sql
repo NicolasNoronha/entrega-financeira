@@ -19,10 +19,13 @@ CREATE TABLE IF NOT EXISTS transactions (
   descricao VARCHAR(255) NOT NULL,
   categoria VARCHAR(80),
   rota_nome VARCHAR(120),
+  cidade_bairro VARCHAR(120),
   periodo VARCHAR(20) CHECK (periodo IS NULL OR periodo IN ('Manha', 'Tarde', 'Noite')),
+  horas_rota NUMERIC(6, 2),
   km_inicial NUMERIC(10, 1),
   km_final NUMERIC(10, 1),
   km_total NUMERIC(10, 1),
+  pacotes_recebidos INTEGER CHECK (pacotes_recebidos IS NULL OR pacotes_recebidos >= 0),
   quantidade_pacotes INTEGER CHECK (quantidade_pacotes IS NULL OR quantidade_pacotes >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -45,10 +48,13 @@ CREATE TABLE IF NOT EXISTS vehicles (
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS veiculo_id UUID;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS categoria VARCHAR(80);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rota_nome VARCHAR(120);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cidade_bairro VARCHAR(120);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS periodo VARCHAR(20);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS horas_rota NUMERIC(6, 2);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10, 1);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS km_final NUMERIC(10, 1);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS km_total NUMERIC(10, 1);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS pacotes_recebidos INTEGER;
 
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, data DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, tipo);

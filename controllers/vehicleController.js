@@ -47,6 +47,26 @@ async function index(req, res) {
   }
 }
 
+async function update(req, res) {
+  try {
+    const input = normalizeVehicleInput(req.body);
+    const errors = validateVehicle(input);
+
+    if (errors.length > 0) {
+      return res.status(400).json({ message: 'Dados invalidos.', errors });
+    }
+
+    const vehicle = await Vehicle.updateVehicle(req.user.id, req.params.id, input);
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Veiculo nao encontrado.' });
+    }
+
+    return res.json({ vehicle });
+  } catch (error) {
+    return res.status(500).json({ message: 'Erro ao editar veiculo.' });
+  }
+}
+
 async function remove(req, res) {
   try {
     const deleted = await Vehicle.deleteVehicle(req.user.id, req.params.id);
@@ -64,5 +84,6 @@ async function remove(req, res) {
 module.exports = {
   create,
   index,
+  update,
   remove
 };

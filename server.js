@@ -25,6 +25,10 @@ app.get(['/admin', '/admin/users'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
+app.get('/landing', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'entregador-financeiro' });
 });

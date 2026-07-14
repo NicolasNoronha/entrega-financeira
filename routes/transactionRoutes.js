@@ -12,6 +12,7 @@ router.get('/', transactionController.index);
 router.post('/', transactionController.create);
 router.get('/dashboard', transactionController.dashboard);
 router.get('/reports', transactionController.report);
+router.put('/:id', transactionController.update);
 router.delete('/:id', transactionController.remove);
 
 module.exports = router;

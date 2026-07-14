@@ -33,6 +33,33 @@ async function listVehicles(userId) {
   return result.rows;
 }
 
+async function updateVehicle(userId, id, data) {
+  const result = await db.query(
+    `UPDATE vehicles
+        SET tipo = $3,
+            modelo = $4,
+            placa = $5,
+            consumo_medio = $6,
+            tipo_combustivel = $7,
+            valor_medio_combustivel = $8,
+            updated_at = NOW()
+      WHERE id = $1 AND user_id = $2
+      RETURNING *`,
+    [
+      id,
+      userId,
+      data.tipo,
+      data.modelo,
+      data.placa || null,
+      data.consumo_medio || null,
+      data.tipo_combustivel || null,
+      data.valor_medio_combustivel || null
+    ]
+  );
+
+  return result.rows[0];
+}
+
 async function deleteVehicle(userId, id) {
   const result = await db.query(
     'DELETE FROM vehicles WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -45,5 +72,6 @@ async function deleteVehicle(userId, id) {
 module.exports = {
   createVehicle,
   listVehicles,
+  updateVehicle,
   deleteVehicle
 };

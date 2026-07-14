@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#10b981">
+    <meta name="theme-color" content="#050807">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Entrega Financeira">
@@ -12,7 +12,7 @@
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/styles.css?v=12">
+    <link rel="stylesheet" href="/styles.css?v=18">
   </head>
   <body class="min-h-screen bg-zinc-950 text-zinc-100 app-mobile">
     <main class="mx-auto min-h-screen w-full max-w-md bg-zinc-950">
@@ -47,11 +47,6 @@
           </div>
 
           <form id="auth-form" class="mt-4 space-y-3">
-            <button id="google-login" class="google-button w-full" type="button">
-              <span>G</span>
-              Entrar com Google
-            </button>
-            <div class="auth-divider"><span>ou acesse com e-mail</span></div>
             <label id="name-field" class="hidden">
               <span>Nome</span>
               <input id="name" autocomplete="name" placeholder="Ex: Nicolas">
@@ -146,7 +141,12 @@
             <section class="panel mt-4">
               <div class="mb-3 flex items-center justify-between">
                 <h3>Gastos por categoria</h3>
-                <span class="muted">Mes atual</span>
+                <span id="category-period-label" class="muted">Mes atual</span>
+              </div>
+              <div class="period-scroll mb-3" aria-label="Periodo dos gastos">
+                <button class="period-chip" data-category-period="dia" type="button">Dia</button>
+                <button class="period-chip" data-category-period="semana" type="button">Semana</button>
+                <button class="period-chip active" data-category-period="mes" type="button">Mes</button>
               </div>
               <div id="category-summary" class="space-y-2"></div>
             </section>
@@ -156,6 +156,10 @@
                 <h3 class="text-lg font-black">Ultimos lancamentos</h3>
                 <span id="transaction-count" class="text-sm text-zinc-400">0 itens</span>
               </div>
+              <label class="mb-3">
+                <span>Filtrar por data</span>
+                <input id="transaction-filter-date" type="date">
+              </label>
               <div id="transaction-list" class="space-y-2"></div>
               <button id="show-more-transactions" class="secondary-button mt-3 hidden w-full" type="button">Mostrar mais</button>
             </section>
@@ -194,17 +198,18 @@
                   <select id="category"></select>
                 </label>
 
-                <label>
-                  <span>Observacao opcional</span>
-                  <input id="description" placeholder="Opcional: rota, cliente, detalhe">
+                <label id="city-field">
+                  <span>Cidade ou bairro</span>
+                  <input id="city-neighborhood" placeholder="Ex: Morretes, Centro">
                 </label>
 
                 <div id="route-fields" class="grid grid-cols-2 gap-3">
                   <label>
                     <span>Rota</span>
-                    <input id="route-name" placeholder="Nome ou codigo">
+                    <input id="route-name" list="route-options" placeholder="Ex: E10, A5, B20">
+                    <datalist id="route-options"></datalist>
                   </label>
-                  <label>
+                  <label id="period-field">
                     <span>Periodo</span>
                     <select id="period-shift">
                       <option value="">Nao informar</option>
@@ -216,9 +221,17 @@
                 </div>
 
                 <div id="package-vehicle-fields" class="grid grid-cols-2 gap-3">
-                  <label>
-                    <span>Pacotes</span>
+                  <label id="received-packages-field">
+                    <span>Pacotes recebidos</span>
+                    <input id="packages-received" type="number" min="0" step="1" inputmode="numeric" placeholder="Inicio do dia">
+                  </label>
+                  <label id="delivered-packages-field">
+                    <span>Pacotes entregues</span>
                     <input id="packages" type="number" min="0" step="1" inputmode="numeric" placeholder="Opcional">
+                  </label>
+                  <label id="route-hours-field">
+                    <span>Horas na rota</span>
+                    <input id="route-hours" type="number" min="0" step="0.25" inputmode="decimal" placeholder="Ex: 6,5">
                   </label>
                   <label>
                     <span>Veiculo</span>
@@ -242,7 +255,8 @@
                 </div>
 
 
-                <button class="primary-button w-full" type="submit">Salvar lancamento</button>
+                <button id="transaction-submit" class="primary-button w-full" type="submit">Salvar lancamento</button>
+                <button id="transaction-cancel-edit" class="secondary-button hidden w-full" type="button">Cancelar edicao</button>
                 <p id="transaction-message" class="min-h-5 text-sm text-emerald-300"></p>
               </form>
             </div>
@@ -300,6 +314,10 @@
               <article class="info-card">
                 <span>Km periodo</span>
                 <strong id="report-km">0</strong>
+              </article>
+              <article class="info-card">
+                <span>Ganho/hora</span>
+                <strong id="report-hourly">R$ 0,00</strong>
               </article>
             </div>
 
@@ -466,7 +484,8 @@
                     <input id="vehicle-fuel-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="R$/L">
                   </label>
                 </div>
-                <button class="primary-button w-full" type="submit">Salvar veiculo</button>
+                <button id="vehicle-submit" class="primary-button w-full" type="submit">Salvar veiculo</button>
+                <button id="vehicle-cancel-edit" class="secondary-button hidden w-full" type="button">Cancelar edicao</button>
                 <p id="vehicle-message" class="min-h-5 text-sm text-emerald-300"></p>
               </form>
             </div>
@@ -510,8 +529,8 @@
           <div id="toast-message" class="toast hidden" role="status"></div>
     </main>
 
-    <script src="/config.js?v=12"></script>
-    <script src="/app.js?v=12"></script>
+    <script src="/config.js?v=18"></script>
+    <script src="/app.js?v=18"></script>
   </body>
 </html>
 

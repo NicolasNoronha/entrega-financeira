@@ -6,8 +6,12 @@ const state = {
   view: 'dashboard',
   vehicles: [],
   transactions: [],
+  routeSuggestions: [],
   visibleTransactions: 10,
-  subscription: null
+  categoryPeriod: 'mes',
+  subscription: null,
+  editingTransactionId: null,
+  editingVehicleId: null
 };
 
 const LOCKED_VIEW = 'subscription';
@@ -76,7 +80,6 @@ const elements = {
   nameField: document.querySelector('#name-field'),
   authForm: document.querySelector('#auth-form'),
   authMessage: document.querySelector('#auth-message'),
-  googleLogin: document.querySelector('#google-login'),
   rememberEmail: document.querySelector('#remember-email'),
   toast: document.querySelector('#toast-message'),
   userName: document.querySelector('#user-name'),
@@ -87,6 +90,7 @@ const elements = {
   transactionMessage: document.querySelector('#transaction-message'),
   transactionList: document.querySelector('#transaction-list'),
   transactionCount: document.querySelector('#transaction-count'),
+  transactionFilterDate: document.querySelector('#transaction-filter-date'),
   showMoreTransactions: document.querySelector('#show-more-transactions'),
   subscriptionCard: document.querySelector('#subscription-card'),
   subscriptionTitle: document.querySelector('#subscription-title'),
@@ -101,6 +105,19 @@ const elements = {
   reportCategory: document.querySelector('#report-category'),
   transactionVehicle: document.querySelector('#transaction-vehicle'),
   reportVehicle: document.querySelector('#report-vehicle'),
+  routeOptions: document.querySelector('#route-options'),
+  routeName: document.querySelector('#route-name'),
+  cityField: document.querySelector('#city-field'),
+  cityNeighborhood: document.querySelector('#city-neighborhood'),
+  packagesReceived: document.querySelector('#packages-received'),
+  routeHours: document.querySelector('#route-hours'),
+  periodField: document.querySelector('#period-field'),
+  receivedPackagesField: document.querySelector('#received-packages-field'),
+  deliveredPackagesField: document.querySelector('#delivered-packages-field'),
+  routeHoursField: document.querySelector('#route-hours-field'),
+  transactionSubmit: document.querySelector('#transaction-submit'),
+  transactionCancelEdit: document.querySelector('#transaction-cancel-edit'),
+  categoryPeriodLabel: document.querySelector('#category-period-label'),
   expenseShortcuts: document.querySelector('#expense-shortcuts'),
   date: document.querySelector('#date'),
   kmStart: document.querySelector('#km-start'),
@@ -111,6 +128,8 @@ const elements = {
   vehicleList: document.querySelector('#vehicle-list'),
   vehicleCount: document.querySelector('#vehicle-count'),
   vehicleMessage: document.querySelector('#vehicle-message'),
+  vehicleSubmit: document.querySelector('#vehicle-submit'),
+  vehicleCancelEdit: document.querySelector('#vehicle-cancel-edit'),
   simulatorForm: document.querySelector('#simulator-form'),
   routeKmFields: document.querySelector('#route-km-fields'),
   routeFields: document.querySelector('#route-fields'),
@@ -180,6 +199,65 @@ function updateVehicleSelects() {
 
   fillSelect(elements.transactionVehicle, vehicleOptions, 'Sem veiculo');
   fillSelect(elements.reportVehicle, vehicleOptions, 'Todos');
+
+  if (state.vehicles.length === 1) {
+    elements.transactionVehicle.value = state.vehicles[0].id;
+  }
+}
+
+async function updateRouteSuggestions() {
+  if (!elements.routeOptions) return;
+
+  const selectedDate = elements.date?.value;
+  let source = state.transactions;
+  let routes = source
+    .filter((item) => item.tipo === 'Receita')
+    .filter((item) => !selectedDate || String(item.data).slice(0, 10) === selectedDate)
+    .filter((item) => item.rota_nome);
+
+  if (selectedDate && state.token && routes.length === 0) {
+    try {
+      const data = await api.request(`/api/transactions?startDate=${selectedDate}&endDate=${selectedDate}`);
+      source = data.transactions;
+      routes = source.filter((item) => item.tipo === 'Receita' && item.rota_nome);
+    } catch (error) {
+      routes = [];
+    }
+  }
+
+  routes = routes.map((item) => ({
+    rota: item.rota_nome,
+    cidade: item.cidade_bairro || ''
+  }));
+  const unique = Array.from(new Map(routes.map((item) => [`${item.rota}|${item.cidade}`, item])).values());
+  state.routeSuggestions = unique;
+
+  elements.routeOptions.innerHTML = unique
+    .map((item) => `<option value="${item.rota}">${item.cidade}</option>`)
+    .join('');
+
+  if (state.type === 'Despesa' && unique.length === 1 && !elements.routeName.value) {
+    elements.routeName.value = unique[0].rota;
+    elements.cityNeighborhood.value = unique[0].cidade;
+  }
+}
+
+function findRouteInfo(date, routeName) {
+  const normalizedRoute = String(routeName || '').trim().toLowerCase();
+  const suggested = state.routeSuggestions.find((item) => String(item.rota || '').trim().toLowerCase() === normalizedRoute);
+  if (suggested) return { rota_nome: suggested.rota, cidade_bairro: suggested.cidade };
+
+  return state.transactions.find((item) => (
+    item.tipo === 'Receita'
+    && String(item.data).slice(0, 10) === date
+    && String(item.rota_nome || '').trim().toLowerCase() === normalizedRoute
+  ));
+}
+
+function syncCityFromRoute() {
+  if (state.type !== 'Despesa') return;
+  const route = findRouteInfo(elements.date.value, elements.routeName.value);
+  elements.cityNeighborhood.value = route?.cidade_bairro || '';
 }
 
 function setMode(mode) {
@@ -224,7 +302,15 @@ function setTransactionType(type) {
   });
   elements.expenseShortcuts.classList.toggle('hidden', type !== 'Despesa');
   elements.routeKmFields?.classList.toggle('hidden', type !== 'Receita');
+  elements.periodField?.classList.toggle('hidden', type !== 'Receita');
+  elements.receivedPackagesField?.classList.toggle('hidden', type !== 'Receita');
+  elements.deliveredPackagesField?.classList.toggle('hidden', type !== 'Receita');
+  elements.routeHoursField?.classList.toggle('hidden', type !== 'Receita');
+  elements.cityField?.classList.toggle('hidden', type === 'Despesa');
+  document.querySelector('#amount').required = true;
+  document.querySelector('#amount').placeholder = '0,00';
   updateCategorySelects();
+  updateRouteSuggestions().then(syncCityFromRoute);
 }
 
 function setView(view) {
@@ -325,8 +411,9 @@ async function loadSubscription() {
   renderSubscription();
 }
 async function loadDashboard() {
-  const data = await api.request('/api/transactions/dashboard?period=mes');
+  const data = await api.request(`/api/transactions/dashboard?period=${state.categoryPeriod}`);
   const summary = data.summary;
+  const periodLabels = { dia: 'Hoje', semana: '7 dias', mes: 'Mes atual' };
 
   setText('#today-revenue', currency.format(summary.receita_hoje));
   setText('#today-expense', currency.format(summary.despesa_hoje));
@@ -339,33 +426,50 @@ async function loadDashboard() {
   setText('#cost-km', currency.format(summary.gasto_por_km));
   document.querySelector('#alert-box').classList.toggle('hidden', !summary.alerta_despesa);
 
-  renderBars('#category-summary', summary.gastos_por_categoria, 'Sem despesas no mes.');
+  if (elements.categoryPeriodLabel) elements.categoryPeriodLabel.textContent = periodLabels[state.categoryPeriod] || 'Mes atual';
+  renderBars('#category-summary', summary.gastos_por_categoria, 'Sem despesas no periodo.');
 }
 
 function transactionTemplate(transaction) {
   const valueClass = transaction.tipo === 'Receita' ? 'text-emerald-300' : 'text-rose-300';
-  const packages = transaction.quantidade_pacotes ? ` - ${transaction.quantidade_pacotes} pacotes` : '';
+  const received = transaction.pacotes_recebidos ? ` - ${transaction.pacotes_recebidos} recebidos` : '';
+  const packages = transaction.quantidade_pacotes ? ` - ${transaction.quantidade_pacotes} entregues` : '';
   const route = transaction.rota_nome ? ` - ${transaction.rota_nome}` : '';
+  const city = transaction.cidade_bairro ? ` - ${transaction.cidade_bairro}` : '';
+  const hours = transaction.horas_rota ? ` - ${Number(transaction.horas_rota).toLocaleString('pt-BR')}h` : '';
   const km = transaction.km_total ? ` - ${formatKm(transaction.km_total)} km` : '';
 
   return `
     <article class="transaction-item">
       <div>
         <strong>${transaction.descricao}</strong>
-        <span>${new Date(transaction.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${transaction.categoria || 'Sem categoria'}${route}${packages}${km}</span>
+        <span>${new Date(transaction.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} - ${transaction.categoria || 'Sem categoria'}${route}${city}${received}${packages}${hours}${km}</span>
       </div>
       <div class="text-right">
         <strong class="${valueClass}">${currency.format(Number(transaction.valor))}</strong>
+        <button class="secondary-button mt-2" data-edit="${transaction.id}" type="button">Editar</button>
         <button class="delete-button mt-2" data-delete="${transaction.id}" type="button" aria-label="Excluir">x</button>
       </div>
     </article>
   `;
 }
 
+function renderTransactions() {
+  const visible = state.transactions.slice(0, state.visibleTransactions);
+  elements.transactionList.innerHTML = visible.map(transactionTemplate).join('');
+  elements.transactionCount.textContent = `${state.transactions.length} itens`;
+  elements.showMoreTransactions?.classList.toggle('hidden', state.visibleTransactions >= state.transactions.length);
+  updateRouteSuggestions();
+}
+
 async function loadTransactions() {
-  const data = await api.request('/api/transactions?period=mes');
-  elements.transactionList.innerHTML = data.transactions.slice(0, 8).map(transactionTemplate).join('');
-  elements.transactionCount.textContent = `${data.transactions.length} itens`;
+  const selectedDate = elements.transactionFilterDate?.value;
+  const query = selectedDate
+    ? `startDate=${selectedDate}&endDate=${selectedDate}`
+    : 'period=mes';
+  const data = await api.request(`/api/transactions?${query}`);
+  state.transactions = data.transactions;
+  renderTransactions();
 }
 
 async function loadVehicles() {
@@ -383,7 +487,10 @@ function renderVehicles() {
         <strong>${vehicle.modelo}</strong>
         <span>${vehicle.tipo}${vehicle.placa ? ` - ${vehicle.placa}` : ''} - ${vehicle.consumo_medio || 0} km/L</span>
       </div>
-      <button class="delete-button" data-delete-vehicle="${vehicle.id}" type="button" aria-label="Excluir">x</button>
+      <div class="text-right">
+        <button class="secondary-button" data-edit-vehicle="${vehicle.id}" type="button">Editar</button>
+        <button class="delete-button mt-2" data-delete-vehicle="${vehicle.id}" type="button" aria-label="Excluir">x</button>
+      </div>
     </article>
   `).join('');
 }
@@ -395,14 +502,14 @@ function renderBars(selector, items, emptyText) {
     return;
   }
 
-  const max = Math.max(...items.map((item) => Number(item.total || item.lucro || 0)), 1);
+  const max = Math.max(...items.map((item) => Math.abs(Number(item.total || item.lucro || 0))), 1);
   container.innerHTML = items.map((item) => {
     const total = Number(item.total ?? item.lucro ?? 0);
-    const width = Math.max((total / max) * 100, 4);
+    const width = Math.max((Math.abs(total) / max) * 100, 4);
     return `
       <div class="bar-row">
         <div class="flex items-center justify-between gap-2 text-sm">
-          <strong class="text-zinc-100">${item.categoria || item.rota}</strong>
+          <strong class="text-zinc-100">${item.categoria || item.label || item.rota}</strong>
           <span class="text-zinc-400">${currency.format(total)}</span>
         </div>
         <div class="bar-line"><span style="width:${width}%"></span></div>
@@ -450,6 +557,7 @@ async function loadReport(event) {
   setText('#report-profit', currency.format(summary.lucro_liquido));
   setText('#report-daily-average', currency.format(summary.media_lucro_por_dia));
   setText('#report-km', formatKm(summary.km_total));
+  setText('#report-hourly', currency.format(summary.ganho_por_hora));
   renderBars('#report-categories', report.despesas_por_categoria, 'Sem despesas no periodo.');
   renderBars('#report-routes', report.lucro_por_rota, 'Sem rotas no periodo.');
 }
@@ -461,13 +569,6 @@ function updateKmTotal() {
 }
 
 elements.loginTab.addEventListener('click', () => setMode('login'));
-elements.googleLogin?.addEventListener('click', () => {
-  if (!window.APP_CONFIG?.GOOGLE_CLIENT_ID) {
-    showToast('Login Google precisa configurar o Client ID.', 'error');
-    return;
-  }
-  showToast('Login Google em configuracao.', 'error');
-});
 elements.registerTab.addEventListener('click', () => setMode('register'));
 
 elements.authForm.addEventListener('submit', async (event) => {
@@ -511,10 +612,19 @@ document.addEventListener('click', (event) => {
   setView(navButton.dataset.nav);
 });
 
+document.querySelectorAll('[data-category-period]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    state.categoryPeriod = button.dataset.categoryPeriod;
+    document.querySelectorAll('[data-category-period]').forEach((item) => {
+      item.classList.toggle('active', item === button);
+    });
+    await loadDashboard();
+  });
+});
+
 document.querySelectorAll('.shortcut-button').forEach((button) => {
   button.addEventListener('click', () => {
     setTransactionType('Despesa');
-    document.querySelector('#description').value = '';
     document.querySelector('#amount').value = button.dataset.value;
     elements.category.value = button.dataset.category;
   });
@@ -522,20 +632,72 @@ document.querySelectorAll('.shortcut-button').forEach((button) => {
 
 elements.kmStart.addEventListener('input', updateKmTotal);
 elements.kmEnd.addEventListener('input', updateKmTotal);
+elements.date.addEventListener('change', async () => {
+  await updateRouteSuggestions();
+  syncCityFromRoute();
+});
+elements.routeName.addEventListener('input', syncCityFromRoute);
+elements.transactionFilterDate?.addEventListener('change', async () => {
+  state.visibleTransactions = 10;
+  await loadTransactions();
+});
+
+function resetTransactionForm() {
+  state.editingTransactionId = null;
+  elements.transactionForm.reset();
+  elements.date.value = today();
+  elements.transactionSubmit.textContent = 'Salvar lancamento';
+  elements.transactionCancelEdit?.classList.add('hidden');
+  setTransactionType('Receita');
+  if (state.vehicles.length === 1) {
+    elements.transactionVehicle.value = state.vehicles[0].id;
+  }
+}
+
+function editTransaction(transaction) {
+  state.editingTransactionId = transaction.id;
+  setTransactionType(transaction.tipo);
+  document.querySelector('#amount').value = transaction.valor ?? '';
+  document.querySelector('#date').value = String(transaction.data).slice(0, 10);
+  elements.category.value = transaction.categoria || '';
+  elements.cityNeighborhood.value = transaction.cidade_bairro || '';
+  document.querySelector('#route-name').value = transaction.rota_nome || '';
+  document.querySelector('#period-shift').value = transaction.periodo || '';
+  elements.packagesReceived.value = transaction.pacotes_recebidos || '';
+  document.querySelector('#packages').value = transaction.quantidade_pacotes || '';
+  elements.routeHours.value = transaction.horas_rota || '';
+  elements.transactionVehicle.value = transaction.veiculo_id || '';
+  elements.kmStart.value = transaction.km_inicial || '';
+  elements.kmEnd.value = transaction.km_final || '';
+  elements.kmTotal.value = transaction.km_total || '';
+  elements.transactionSubmit.textContent = 'Salvar alteracoes';
+  elements.transactionCancelEdit?.classList.remove('hidden');
+  setView('entry');
+}
 
 elements.transactionForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   elements.transactionMessage.textContent = '';
+
+  const routeInfo = state.type === 'Despesa'
+    ? findRouteInfo(elements.date.value, elements.routeName.value)
+    : null;
+  const cityNeighborhood = state.type === 'Despesa'
+    ? (routeInfo?.cidade_bairro || elements.cityNeighborhood.value || '')
+    : elements.cityNeighborhood.value;
 
   const body = {
     tipo: state.type,
     valor: document.querySelector('#amount').value,
     data: document.querySelector('#date').value,
     categoria: elements.category.value,
-    descricao: document.querySelector('#description').value || elements.category.value || state.type,
-    rota_nome: document.querySelector('#route-name').value,
-    periodo: document.querySelector('#period-shift').value || null,
-    quantidade_pacotes: document.querySelector('#packages').value || null,
+    descricao: cityNeighborhood || elements.category.value || state.type,
+    cidade_bairro: cityNeighborhood,
+    rota_nome: elements.routeName.value,
+    periodo: state.type === 'Receita' ? document.querySelector('#period-shift').value || null : null,
+    pacotes_recebidos: state.type === 'Receita' ? elements.packagesReceived.value || null : null,
+    quantidade_pacotes: state.type === 'Receita' ? document.querySelector('#packages').value || null : null,
+    horas_rota: state.type === 'Receita' ? elements.routeHours.value || null : null,
     veiculo_id: elements.transactionVehicle.value || null,
     km_inicial: elements.kmStart.value || null,
     km_final: elements.kmEnd.value || null,
@@ -543,14 +705,14 @@ elements.transactionForm.addEventListener('submit', async (event) => {
   };
 
   try {
-    await api.request('/api/transactions', {
-      method: 'POST',
+    const wasEditing = Boolean(state.editingTransactionId);
+    const endpoint = state.editingTransactionId ? `/api/transactions/${state.editingTransactionId}` : '/api/transactions';
+    await api.request(endpoint, {
+      method: state.editingTransactionId ? 'PUT' : 'POST',
       body: JSON.stringify(body)
     });
-    elements.transactionForm.reset();
-    elements.date.value = today();
-    setTransactionType('Receita');
-    elements.transactionMessage.textContent = 'Lancamento salvo.';
+    resetTransactionForm();
+    elements.transactionMessage.textContent = wasEditing ? 'Lancamento editado.' : 'Lancamento salvo.';
     showToast('Lancamento realizado com sucesso.');
     await refresh();
   } catch (error) {
@@ -558,12 +720,21 @@ elements.transactionForm.addEventListener('submit', async (event) => {
   }
 });
 
+elements.transactionCancelEdit?.addEventListener('click', resetTransactionForm);
+
 elements.showMoreTransactions?.addEventListener('click', () => {
   state.visibleTransactions += 10;
   renderTransactions();
 });
 
 elements.transactionList.addEventListener('click', async (event) => {
+  const editButton = event.target.closest('[data-edit]');
+  if (editButton) {
+    const transaction = state.transactions.find((item) => item.id === editButton.dataset.edit);
+    if (transaction) editTransaction(transaction);
+    return;
+  }
+
   const button = event.target.closest('[data-delete]');
   if (!button) return;
 
@@ -587,12 +758,14 @@ elements.vehicleForm.addEventListener('submit', async (event) => {
   };
 
   try {
-    await api.request('/api/vehicles', {
-      method: 'POST',
+    const wasEditing = Boolean(state.editingVehicleId);
+    const endpoint = state.editingVehicleId ? `/api/vehicles/${state.editingVehicleId}` : '/api/vehicles';
+    await api.request(endpoint, {
+      method: state.editingVehicleId ? 'PUT' : 'POST',
       body: JSON.stringify(body)
     });
-    elements.vehicleForm.reset();
-    elements.vehicleMessage.textContent = 'Veiculo salvo.';
+    resetVehicleForm();
+    elements.vehicleMessage.textContent = wasEditing ? 'Veiculo editado.' : 'Veiculo salvo.';
     showToast('Veiculo cadastrado com sucesso.');
     await loadVehicles();
   } catch (error) {
@@ -600,7 +773,35 @@ elements.vehicleForm.addEventListener('submit', async (event) => {
   }
 });
 
+function resetVehicleForm() {
+  state.editingVehicleId = null;
+  elements.vehicleForm.reset();
+  elements.vehicleSubmit.textContent = 'Salvar veiculo';
+  elements.vehicleCancelEdit?.classList.add('hidden');
+}
+
+function editVehicle(vehicle) {
+  state.editingVehicleId = vehicle.id;
+  document.querySelector('#vehicle-type').value = vehicle.tipo || 'Moto';
+  document.querySelector('#vehicle-model').value = vehicle.modelo || '';
+  document.querySelector('#vehicle-plate').value = vehicle.placa || '';
+  document.querySelector('#vehicle-consumption').value = vehicle.consumo_medio || '';
+  document.querySelector('#vehicle-fuel-type').value = vehicle.tipo_combustivel || 'Gasolina';
+  document.querySelector('#vehicle-fuel-price').value = vehicle.valor_medio_combustivel || '';
+  elements.vehicleSubmit.textContent = 'Salvar alteracoes';
+  elements.vehicleCancelEdit?.classList.remove('hidden');
+}
+
+elements.vehicleCancelEdit?.addEventListener('click', resetVehicleForm);
+
 elements.vehicleList.addEventListener('click', async (event) => {
+  const editButton = event.target.closest('[data-edit-vehicle]');
+  if (editButton) {
+    const vehicle = state.vehicles.find((item) => item.id === editButton.dataset.editVehicle);
+    if (vehicle) editVehicle(vehicle);
+    return;
+  }
+
   const button = event.target.closest('[data-delete-vehicle]');
   if (!button) return;
 
@@ -683,7 +884,7 @@ window.addEventListener('offline', updateConnectionStatus);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=12').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=18').catch(() => {});
   });
 }
 

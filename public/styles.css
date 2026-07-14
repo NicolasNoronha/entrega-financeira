@@ -2,6 +2,21 @@
   box-sizing: border-box;
 }
 
+:root {
+  --color-900: #0F172A;
+  --color-700: #1E40AF;
+  --color-500: #2563EB;
+  --color-100: #E2E8F0;
+  --color-050: #F8FAFC;
+  --income: #059669;
+  --expense: #DC2626;
+  --warning: #D97706;
+  --surface: #FFFFFF;
+  --surface-strong: #F1F5F9;
+  --text: #0F172A;
+  --muted-text: #475569;
+}
+
 body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -795,4 +810,238 @@ select {
 .bottom-nav .nav-icon {
   height: 1.42rem;
   width: 1.42rem;
+}
+
+/* v17: black and green app palette */
+:root {
+  --color-900: #050807;
+  --color-800: #0B1210;
+  --color-700: #121C18;
+  --color-600: #1D2B25;
+  --color-500: #00C781;
+  --color-400: #35E0A1;
+  --color-100: #DFF8EC;
+  --color-050: #F4FFF9;
+  --income: #00C781;
+  --expense: #FF5D5D;
+  --warning: #F8B84E;
+  --surface: #0B1210;
+  --surface-strong: #121C18;
+  --text: #F4FFF9;
+  --muted-text: #95A8A0;
+}
+
+body,
+.app-mobile main,
+.admin-body {
+  background: var(--color-900);
+  color: var(--text);
+}
+
+.app-mobile main,
+#auth-screen {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0, 199, 129, 0.16), transparent 34%),
+    linear-gradient(180deg, #08110E 0%, #050807 100%);
+}
+
+.auth-panel,
+.panel,
+.metric-card,
+.info-card,
+.transaction-item,
+.list-item,
+.admin-card,
+.admin-toolbar,
+.admin-user-card,
+.admin-stats article {
+  border-color: rgba(53, 224, 161, 0.14);
+  background: rgba(18, 28, 24, 0.96);
+  color: var(--text);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.34);
+}
+
+.panel h3,
+.metric-card strong,
+.info-card strong,
+.transaction-item strong,
+.list-item strong,
+#user-name,
+.auth-panel h2,
+.auth-hero h1,
+.admin-header h1,
+.admin-user-main strong,
+.admin-stats strong {
+  color: var(--text);
+}
+
+.muted,
+.metric-card span,
+.info-card span,
+.transaction-item span,
+.list-item span,
+.admin-header span,
+.admin-user-main span:not(.admin-badge),
+.admin-user-meta,
+.remember-row span,
+label span {
+  color: var(--color-400);
+}
+
+input,
+select,
+.auth-panel input,
+.admin-form input {
+  border-color: rgba(223, 248, 236, 0.16);
+  background: #080D0B;
+  color: var(--text);
+}
+
+input:focus,
+select:focus {
+  border-color: var(--color-500);
+  box-shadow: 0 0 0 3px rgba(0, 199, 129, 0.18);
+}
+
+.primary-button,
+.admin-primary {
+  background: var(--income);
+  color: #04110C;
+  box-shadow: 0 12px 28px rgba(0, 199, 129, 0.24);
+}
+
+.type-button.active,
+.nav-button.active .nav-icon {
+  background: var(--income);
+  color: #04110C;
+}
+
+.secondary-button,
+.shortcut-button,
+.admin-link,
+.admin-actions button,
+.admin-filters button {
+  border-color: rgba(53, 224, 161, 0.16);
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.tab-button.active,
+.period-button.active {
+  background: var(--income);
+  color: #04110C;
+}
+
+.bottom-nav {
+  border-color: rgba(53, 224, 161, 0.13);
+  background: rgba(5, 8, 7, 0.98);
+}
+
+.nav-button {
+  color: var(--muted-text);
+}
+
+.nav-button.active {
+  border-color: rgba(0, 199, 129, 0.34);
+  background: rgba(0, 199, 129, 0.12);
+  color: var(--text);
+}
+
+.nav-icon {
+  background: var(--color-600);
+  color: var(--text);
+}
+
+.text-zinc-100,
+.text-white {
+  color: var(--text) !important;
+}
+
+.text-zinc-300,
+.text-zinc-400 {
+  color: var(--muted-text) !important;
+}
+
+.text-emerald-100,
+.text-emerald-300 {
+  color: var(--color-400) !important;
+}
+
+.text-emerald-300 {
+  color: var(--income) !important;
+}
+
+.text-rose-300 {
+  color: var(--expense) !important;
+}
+
+.bg-zinc-950,
+.bg-zinc-900,
+.bg-zinc-900\/95,
+.bg-zinc-950\/95 {
+  background-color: var(--color-900) !important;
+}
+
+.border-zinc-800 {
+  border-color: rgba(53, 224, 161, 0.14) !important;
+}
+
+.period-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  scrollbar-width: none;
+}
+
+.period-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.period-chip {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  border: 1px solid rgba(53, 224, 161, 0.16);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 0 0.85rem;
+}
+
+.period-chip.active {
+  border-color: rgba(0, 199, 129, 0.36);
+  background: var(--income);
+  color: #04110C;
+}
+
+.bar-line span {
+  background: var(--income);
+}
+
+.metric-card.border-emerald-500\/40,
+.info-card.border-emerald-500\/40 {
+  border-color: rgba(0, 199, 129, 0.32) !important;
+  background: rgba(0, 199, 129, 0.10) !important;
+}
+
+.auth-benefits span,
+.subscription-badge,
+.admin-badge {
+  border-color: rgba(0, 199, 129, 0.28);
+  background: rgba(0, 199, 129, 0.12);
+  color: var(--color-400);
+}
+
+.auth-panel {
+  background: linear-gradient(180deg, rgba(0, 199, 129, 0.07), rgba(18, 28, 24, 0.98));
+}
+
+.sticky {
+  background: rgba(5, 8, 7, 0.92) !important;
+}
+
+input::placeholder {
+  color: #64776F;
 }
