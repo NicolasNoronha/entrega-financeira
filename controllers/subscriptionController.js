@@ -25,6 +25,15 @@ function getPaymentId(req) {
   return req.query.id || req.query['data.id'] || req.body?.data?.id || req.body?.id;
 }
 
+function getNotificationType(req) {
+  return req.query.type || req.body?.type;
+}
+
+function isMercadoPagoSimulation(req) {
+  const paymentId = getPaymentId(req);
+  return req.body?.live_mode === false && String(paymentId) === '123456';
+}
+
 function validateMercadoPagoWebhook(req) {
   const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
   if (!secret) return true;
@@ -126,6 +135,15 @@ async function renew(req, res) {
 
 async function mercadoPagoWebhook(req, res) {
   try {
+    const notificationType = getNotificationType(req);
+    if (notificationType && notificationType !== 'payment') {
+      return res.status(200).json({ received: true, ignored: notificationType });
+    }
+
+    if (isMercadoPagoSimulation(req)) {
+      return res.status(200).json({ received: true, simulated: true });
+    }
+
     validateMercadoPagoWebhook(req);
 
     const paymentId = getPaymentId(req);
@@ -141,7 +159,7 @@ async function mercadoPagoWebhook(req, res) {
     if (payment.status === 'approved') {
       await Subscription.markPaymentPaid({
         providerPaymentId: String(payment.id),
-        providerPreferenceId: payment.external_reference,
+        localPaymentId: payment.external_reference,
         rawPayload: payment
       });
     }
