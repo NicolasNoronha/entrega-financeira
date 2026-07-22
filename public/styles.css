@@ -501,6 +501,37 @@ select {
   background: rgb(69 26 3);
   color: rgb(254 243 199);
 }
+
+.pull-refresh {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  left: 50%;
+  z-index: 50;
+  transform: translateX(-50%) translateY(-0.5rem);
+  border: 1px solid rgba(0, 199, 129, 0.32);
+  border-radius: 999px;
+  background: rgba(11, 18, 16, 0.94);
+  color: rgb(244 255 249);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  padding: 0.52rem 0.85rem;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease, border-color 160ms ease;
+}
+
+.pull-refresh.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.pull-refresh.ready,
+.pull-refresh.loading {
+  border-color: rgba(53, 224, 161, 0.72);
+  background: rgba(0, 199, 129, 0.18);
+}
 /* v9: subscription */
 .subscription-badge {
   flex: 0 0 auto;

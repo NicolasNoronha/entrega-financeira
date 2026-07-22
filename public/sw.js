@@ -1,13 +1,13 @@
-const CACHE_NAME = 'entrega-financeira-v20';
+const CACHE_NAME = 'entrega-financeira-v21';
 const STATIC_ASSETS = [
   '/',
   '/app',
   '/landing.html',
   '/index.html',
   '/landing.css?v=1',
-  '/styles.css?v=20',
-  '/config.js?v=20',
-  '/app.js?v=20',
+  '/styles.css?v=21',
+  '/config.js?v=21',
+  '/app.js?v=21',
   '/manifest.webmanifest',
   '/icons/icon.svg'
 ];

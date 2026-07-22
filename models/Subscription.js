@@ -84,14 +84,29 @@ async function markPaymentPaid({ providerPaymentId, providerPreferenceId, localP
          OR (provider_preference_id = $2 AND $2 IS NOT NULL)
          OR (id::text = $3 AND $3 IS NOT NULL)
       )
+        AND status <> 'paid'
         ${userFilter}
       RETURNING *`,
     params
   );
 
   if (!payment.rows[0]) return null;
-  await grantDays(payment.rows[0].user_id, payment.rows[0].days_granted, 'active');
+  await activatePaidAccess(payment.rows[0].user_id, payment.rows[0].days_granted);
   return payment.rows[0];
+}
+
+async function activatePaidAccess(userId, days) {
+  const result = await db.query(
+    `UPDATE users
+        SET subscription_status = 'active',
+            access_expires_at = NOW() + ($2::text || ' days')::interval,
+            updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, nome, email, role, subscription_status, trial_ends_at, access_expires_at, subscription_notes, created_at`,
+    [userId, Number(days)]
+  );
+
+  return normalizeUser(result.rows[0]);
 }
 
 async function grantDays(userId, days, status = 'active', notes = null) {
@@ -150,6 +165,7 @@ module.exports = {
   createPayment,
   updatePaymentPreference,
   markPaymentPaid,
+  activatePaidAccess,
   grantDays,
   setStatus,
   listUsers,

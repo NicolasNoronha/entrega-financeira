@@ -87,6 +87,7 @@ const elements = {
   authMessage: document.querySelector('#auth-message'),
   rememberEmail: document.querySelector('#remember-email'),
   toast: document.querySelector('#toast-message'),
+  pullRefresh: document.querySelector('#pull-refresh'),
   userName: document.querySelector('#user-name'),
   logoutButton: document.querySelector('#logout-button'),
   installButton: document.querySelector('#install-button'),
@@ -582,6 +583,36 @@ async function refresh() {
   await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles()]);
 }
 
+let manualRefreshRunning = false;
+
+async function manualRefresh() {
+  if (!state.token || manualRefreshRunning) return;
+
+  manualRefreshRunning = true;
+  if (elements.pullRefresh) {
+    elements.pullRefresh.textContent = 'Atualizando...';
+    elements.pullRefresh.classList.remove('hidden', 'ready');
+    elements.pullRefresh.classList.add('visible', 'loading');
+  }
+
+  try {
+    await refresh();
+    if (!isSubscriptionLocked()) {
+      await loadReport();
+    }
+    showToast('App atualizado.');
+  } catch (error) {
+    showToast(error.message || 'Nao foi possivel atualizar agora.', 'error');
+  } finally {
+    manualRefreshRunning = false;
+    if (elements.pullRefresh) {
+      elements.pullRefresh.classList.remove('visible', 'loading', 'ready');
+      elements.pullRefresh.classList.add('hidden');
+      elements.pullRefresh.textContent = 'Solte para atualizar';
+    }
+  }
+}
+
 let lastSubscriptionFocusRefresh = 0;
 
 async function refreshSubscriptionAfterReturn() {
@@ -961,9 +992,52 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+let pullStartY = 0;
+let pullDistance = 0;
+let pullTracking = false;
+
+function resetPullRefresh() {
+  pullStartY = 0;
+  pullDistance = 0;
+  pullTracking = false;
+  if (!elements.pullRefresh || manualRefreshRunning) return;
+  elements.pullRefresh.classList.add('hidden');
+  elements.pullRefresh.classList.remove('visible', 'ready');
+  elements.pullRefresh.textContent = 'Solte para atualizar';
+}
+
+document.addEventListener('touchstart', (event) => {
+  if (!state.token || window.scrollY > 2 || manualRefreshRunning) return;
+
+  pullStartY = event.touches[0].clientY;
+  pullTracking = true;
+}, { passive: true });
+
+document.addEventListener('touchmove', (event) => {
+  if (!pullTracking || !elements.pullRefresh) return;
+
+  pullDistance = event.touches[0].clientY - pullStartY;
+  if (pullDistance <= 18) return;
+
+  elements.pullRefresh.classList.remove('hidden');
+  elements.pullRefresh.classList.add('visible');
+  elements.pullRefresh.classList.toggle('ready', pullDistance >= 80);
+  elements.pullRefresh.textContent = pullDistance >= 80 ? 'Solte para atualizar' : 'Puxe para atualizar';
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  if (!pullTracking) return;
+
+  const shouldRefresh = pullDistance >= 80;
+  resetPullRefresh();
+  if (shouldRefresh) {
+    manualRefresh().catch(() => {});
+  }
+}, { passive: true });
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=20').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=21').catch(() => {});
   });
 }
 
