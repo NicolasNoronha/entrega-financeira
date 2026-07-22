@@ -11,7 +11,9 @@ const state = {
   categoryPeriod: 'mes',
   subscription: null,
   editingTransactionId: null,
-  editingVehicleId: null
+  editingVehicleId: null,
+  paymentReturn: new URLSearchParams(window.location.search).get('payment'),
+  paymentReturnHandled: false
 };
 
 const LOCKED_VIEW = 'subscription';
@@ -347,6 +349,28 @@ function handleSubscriptionExpired(message) {
   showToast(message || 'Renove para continuar usando o app.', 'error');
 }
 
+function handlePaymentReturn() {
+  if (!state.paymentReturn || state.paymentReturnHandled) return;
+
+  state.paymentReturnHandled = true;
+  setView(LOCKED_VIEW);
+
+  const messages = {
+    success: state.subscription?.is_active
+      ? 'Assinatura renovada com sucesso. Acesso liberado!'
+      : 'Pagamento aprovado. Estamos atualizando sua assinatura.',
+    pending: 'Pagamento em processamento. Assim que aprovar, o acesso sera liberado.',
+    failure: 'Pagamento nao concluido. Voce pode tentar renovar novamente.'
+  };
+  const isFailure = state.paymentReturn === 'failure';
+
+  showToast(messages[state.paymentReturn] || 'Retorno de pagamento recebido.', isFailure ? 'error' : 'success');
+
+  if (window.history?.replaceState && window.location.pathname === '/app') {
+    window.history.replaceState({}, document.title, '/app');
+  }
+}
+
 function updateSubscriptionLock() {
   const locked = isSubscriptionLocked();
   elements.appScreen.classList.toggle('is-subscription-locked', locked);
@@ -520,6 +544,10 @@ function renderBars(selector, items, emptyText) {
 
 async function refresh() {
   await loadSubscription();
+
+  if (state.paymentReturn) {
+    handlePaymentReturn();
+  }
 
   if (isSubscriptionLocked()) {
     setView(LOCKED_VIEW);
@@ -884,7 +912,7 @@ window.addEventListener('offline', updateConnectionStatus);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=18').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=19').catch(() => {});
   });
 }
 

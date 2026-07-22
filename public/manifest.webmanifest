@@ -2,7 +2,7 @@
   "name": "Entrega Financeira",
   "short_name": "Entregas",
   "description": "Controle financeiro mobile para entregadores autonomos.",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -21,7 +21,7 @@
     {
       "name": "Abrir painel",
       "short_name": "Painel",
-      "url": "/"
+      "url": "/app"
     }
   ]
 }

@@ -1,10 +1,13 @@
-const CACHE_NAME = 'entrega-financeira-v18';
+const CACHE_NAME = 'entrega-financeira-v19';
 const STATIC_ASSETS = [
   '/',
+  '/app',
+  '/landing.html',
   '/index.html',
-  '/styles.css?v=18',
-  '/config.js?v=18',
-  '/app.js?v=18',
+  '/landing.css?v=1',
+  '/styles.css?v=19',
+  '/config.js?v=19',
+  '/app.js?v=19',
   '/manifest.webmanifest',
   '/icons/icon.svg'
 ];
@@ -35,7 +38,11 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(event.request).catch(() => (
+        requestUrl.pathname.startsWith('/app')
+          ? caches.match('/index.html')
+          : caches.match('/landing.html')
+      ))
     );
     return;
   }

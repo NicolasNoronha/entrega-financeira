@@ -76,9 +76,9 @@ async function createMercadoPagoPreference({ user, paymentId, amount }) {
     external_reference: paymentId,
     notification_url: publicBaseUrl ? `${publicBaseUrl}/api/subscription/webhook/mercado-pago` : undefined,
     back_urls: publicBaseUrl ? {
-      success: `${publicBaseUrl}/payment-success.html`,
-      pending: `${publicBaseUrl}/payment-pending.html`,
-      failure: `${publicBaseUrl}/payment-failure.html`
+      success: `${publicBaseUrl}/app?payment=success`,
+      pending: `${publicBaseUrl}/app?payment=pending`,
+      failure: `${publicBaseUrl}/app?payment=failure`
     } : undefined,
     auto_return: publicBaseUrl ? 'approved' : undefined
   };
