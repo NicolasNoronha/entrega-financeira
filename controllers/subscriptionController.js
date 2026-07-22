@@ -49,6 +49,36 @@ function validateMercadoPagoWebhook(req) {
   return true;
 }
 
+async function processMercadoPagoPayment(paymentId, { expectedUserId } = {}) {
+  const client = getMercadoPagoClient();
+
+  if (!paymentId || !client) {
+    return { processed: false, reason: 'missing_payment_or_client' };
+  }
+
+  const paymentClient = new Payment(client);
+  const payment = await paymentClient.get({ id: paymentId });
+
+  if (payment.status !== 'approved') {
+    return { processed: false, status: payment.status, payment };
+  }
+
+  const paidPayment = await Subscription.markPaymentPaid({
+    providerPaymentId: String(payment.id),
+    providerPreferenceId: payment.preference_id ? String(payment.preference_id) : null,
+    localPaymentId: payment.external_reference,
+    userId: expectedUserId,
+    rawPayload: payment
+  });
+
+  return {
+    processed: Boolean(paidPayment),
+    status: payment.status,
+    payment,
+    subscriptionPayment: paidPayment
+  };
+}
+
 async function createMercadoPagoPreference({ user, paymentId, amount }) {
   const client = getMercadoPagoClient();
   if (!client) {
@@ -144,38 +174,49 @@ async function mercadoPagoWebhook(req, res) {
       return res.status(200).json({ received: true, simulated: true });
     }
 
-    validateMercadoPagoWebhook(req);
-
     const paymentId = getPaymentId(req);
-    const client = getMercadoPagoClient();
 
-    if (!paymentId || !client) {
-      return res.status(200).json({ received: true });
-    }
-
-    const paymentClient = new Payment(client);
-    const payment = await paymentClient.get({ id: paymentId });
-
-    if (payment.status === 'approved') {
-      await Subscription.markPaymentPaid({
-        providerPaymentId: String(payment.id),
-        localPaymentId: payment.external_reference,
-        rawPayload: payment
+    try {
+      validateMercadoPagoWebhook(req);
+    } catch (error) {
+      if (!(error instanceof InvalidWebhookSignatureError)) {
+        throw error;
+      }
+      console.warn('Mercado Pago webhook com assinatura invalida; confirmando pagamento pela API.', {
+        paymentId,
+        notificationId: req.body?.id
       });
     }
 
-    return res.status(200).json({ received: true });
-  } catch (error) {
-    if (error instanceof InvalidWebhookSignatureError) {
-      return res.status(401).json({ received: false });
-    }
+    const result = await processMercadoPagoPayment(paymentId);
 
+    return res.status(200).json({ received: true, processed: result.processed });
+  } catch (error) {
+    console.error('Erro ao processar webhook Mercado Pago:', error.message);
     return res.status(200).json({ received: true });
+  }
+}
+
+async function syncPayment(req, res) {
+  try {
+    const paymentId = req.body?.payment_id || req.query.payment_id || req.query.collection_id || req.body?.collection_id;
+    const result = await processMercadoPagoPayment(paymentId, { expectedUserId: req.user.id });
+    const data = await Subscription.getSubscription(req.user.id);
+
+    return res.json({
+      processed: result.processed,
+      payment_status: result.status || null,
+      subscription: data.subscription,
+      payments: data.payments
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message || 'Erro ao sincronizar pagamento.' });
   }
 }
 
 module.exports = {
   status,
   renew,
+  syncPayment,
   mercadoPagoWebhook
 };

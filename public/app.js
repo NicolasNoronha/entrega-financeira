@@ -1,3 +1,5 @@
+const pageParams = new URLSearchParams(window.location.search);
+
 const state = {
   token: localStorage.getItem('token'),
   user: JSON.parse(localStorage.getItem('user') || 'null'),
@@ -12,7 +14,8 @@ const state = {
   subscription: null,
   editingTransactionId: null,
   editingVehicleId: null,
-  paymentReturn: new URLSearchParams(window.location.search).get('payment'),
+  paymentReturn: pageParams.get('payment'),
+  paymentId: pageParams.get('payment_id') || pageParams.get('collection_id'),
   paymentReturnHandled: false
 };
 
@@ -349,14 +352,36 @@ function handleSubscriptionExpired(message) {
   showToast(message || 'Renove para continuar usando o app.', 'error');
 }
 
-function handlePaymentReturn() {
+async function syncPaymentReturn() {
+  if (!state.paymentReturn || !state.paymentId || state.paymentReturn === 'failure') return null;
+
+  try {
+    const data = await api.request('/api/subscription/sync-payment', {
+      method: 'POST',
+      body: JSON.stringify({ payment_id: state.paymentId })
+    });
+
+    if (data.subscription) {
+      state.subscription = data.subscription;
+      renderSubscription();
+    }
+
+    return data;
+  } catch (error) {
+    showToast('Pagamento recebido, mas a confirmacao ainda esta em processamento.', 'error');
+    return null;
+  }
+}
+
+async function handlePaymentReturn() {
   if (!state.paymentReturn || state.paymentReturnHandled) return;
 
   state.paymentReturnHandled = true;
   setView(LOCKED_VIEW);
+  const syncResult = await syncPaymentReturn();
 
   const messages = {
-    success: state.subscription?.is_active
+    success: syncResult?.processed || state.subscription?.is_active
       ? 'Assinatura renovada com sucesso. Acesso liberado!'
       : 'Pagamento aprovado. Estamos atualizando sua assinatura.',
     pending: 'Pagamento em processamento. Assim que aprovar, o acesso sera liberado.',
@@ -546,7 +571,7 @@ async function refresh() {
   await loadSubscription();
 
   if (state.paymentReturn) {
-    handlePaymentReturn();
+    await handlePaymentReturn();
   }
 
   if (isSubscriptionLocked()) {
@@ -555,6 +580,24 @@ async function refresh() {
   }
 
   await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles()]);
+}
+
+let lastSubscriptionFocusRefresh = 0;
+
+async function refreshSubscriptionAfterReturn() {
+  if (!state.token) return;
+
+  const now = Date.now();
+  if (now - lastSubscriptionFocusRefresh < 3000) return;
+  lastSubscriptionFocusRefresh = now;
+
+  const wasLocked = isSubscriptionLocked();
+  await loadSubscription();
+
+  if (wasLocked && !isSubscriptionLocked()) {
+    showToast('Assinatura atualizada. Acesso liberado!');
+    await Promise.allSettled([loadDashboard(), loadTransactions(), loadVehicles()]);
+  }
 }
 
 async function loadReport(event) {
@@ -909,10 +952,18 @@ function updateConnectionStatus() {
 
 window.addEventListener('online', updateConnectionStatus);
 window.addEventListener('offline', updateConnectionStatus);
+window.addEventListener('focus', () => {
+  refreshSubscriptionAfterReturn().catch(() => {});
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    refreshSubscriptionAfterReturn().catch(() => {});
+  }
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js?v=19').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=20').catch(() => {});
   });
 }
 

@@ -63,7 +63,15 @@ async function updatePaymentPreference(paymentId, { provider, preferenceId, paym
 
   return result.rows[0];
 }
-async function markPaymentPaid({ providerPaymentId, providerPreferenceId, localPaymentId, rawPayload }) {
+async function markPaymentPaid({ providerPaymentId, providerPreferenceId, localPaymentId, userId, rawPayload }) {
+  const params = [
+    providerPaymentId || null,
+    providerPreferenceId || null,
+    localPaymentId || null,
+    rawPayload || null
+  ];
+  const userFilter = userId ? `AND user_id = $${params.push(userId)}` : '';
+
   const payment = await db.query(
     `UPDATE subscription_payments
         SET provider_payment_id = COALESCE($1, provider_payment_id),
@@ -71,11 +79,14 @@ async function markPaymentPaid({ providerPaymentId, providerPreferenceId, localP
             paid_at = NOW(),
             raw_payload = $4,
             updated_at = NOW()
-      WHERE (provider_payment_id = $1 AND $1 IS NOT NULL)
+      WHERE (
+            (provider_payment_id = $1 AND $1 IS NOT NULL)
          OR (provider_preference_id = $2 AND $2 IS NOT NULL)
          OR (id::text = $3 AND $3 IS NOT NULL)
+      )
+        ${userFilter}
       RETURNING *`,
-    [providerPaymentId || null, providerPreferenceId || null, localPaymentId || null, rawPayload || null]
+    params
   );
 
   if (!payment.rows[0]) return null;
